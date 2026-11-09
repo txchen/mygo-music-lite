@@ -99,6 +99,21 @@ func openMPV(st *music.Stream) (engine, error) {
 			return nil, err
 		}
 	}
+	// load-scripts only covers external scripts. Built-ins start LuaJIT, whose
+	// executable pages are rejected by the signed app's hardened runtime.
+	for _, name := range []string{
+		"ytdl", "load-stats-overlay", "load-console", "load-osd-console", "load-auto-profiles",
+		"load-select", "load-positioning", "load-commands", "load-context-menu",
+	} {
+		code := mpvAPI.option(p.handle, name, "no")
+		if code == -5 { // MPV_ERROR_OPTION_NOT_FOUND: unavailable on this mpv version.
+			continue
+		}
+		if err := mpvError(code); err != nil {
+			p.Close()
+			return nil, err
+		}
+	}
 	if err := mpvError(mpvAPI.initialize(p.handle)); err != nil {
 		p.Close()
 		return nil, err
