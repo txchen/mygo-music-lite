@@ -624,9 +624,9 @@ func (p *Player) loadSkipping(at, skipped, dir int, play bool, from time.Duratio
 			if _, local := music.PathOf(info.URL); !local {
 				relay, err = newAudioRelay(info)
 				if err == nil {
-					// Closing the load cancels both preparation and an unadopted relay.
+					// Closing the load cancels both validation and an unadopted relay.
 					context.AfterFunc(ctx, relay.Close)
-					err = relay.prepare(ctx)
+					err = relay.validate(ctx)
 				}
 			}
 		}

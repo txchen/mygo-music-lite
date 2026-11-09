@@ -19,7 +19,7 @@ cask "mygo-music-lite" do
       header: "Accept: application/octet-stream"
   container type: :zip
   name "MyGo Music Lite"
-  desc "Local music player with AVPlayer and optional mpv playback"
+  desc "Music player with bundled FFmpeg and miniaudio playback"
   homepage "https://github.com/txchen/mygo-music-lite"
 
   depends_on arch: :arm64

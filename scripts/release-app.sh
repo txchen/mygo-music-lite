@@ -21,6 +21,8 @@ keychain=$4
 case "$stage" in
   prepare)
     [[ ! -e $release ]] || { echo "Release directory already exists: $release" >&2; exit 1; }
+    [[ -z $(git status --porcelain) ]] || { echo 'Commit all source changes before preparing a release.' >&2; exit 1; }
+    scripts/build-audio.sh
     GOFLAGS='' MACOSX_DEPLOYMENT_TARGET=13.0 CGO_ENABLED=1 \
       CGO_CFLAGS='-mmacosx-version-min=13.0' \
       CGO_CXXFLAGS='-mmacosx-version-min=13.0' \
@@ -33,7 +35,10 @@ case "$stage" in
     [[ $minos == 13.0 ]] || { echo "Expected Mach-O minos 13.0, got: $minos" >&2; exit 1; }
     [[ $(lipo -archs "$built/Contents/MacOS/$executable") == arm64 ]]
     mkdir -p "$release"
+    git rev-parse HEAD > "$release/source-commit.txt"
     ditto "$built" "$release/$app"
+    mkdir -p "$release/$app/Contents/Resources/Licenses"
+    cp LICENSE THIRD_PARTY.md LICENSES/* "$release/$app/Contents/Resources/Licenses/"
     cat > "$release/entitlements.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

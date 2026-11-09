@@ -1,17 +1,41 @@
 # Playback verification
 
+## 0.4.0 verification, 2026-11-09
+
+On an M1 Mac mini running macOS 27.2, the complete internal test suite, MyGo vet,
+and player Go race tests passed. A separate AddressSanitizer native harness
+passed 40 open/rapid-seek/pause/close cycles. Go's race detector does not cover
+the C implementation; the sanitizer and ownership review provide separate
+evidence, not a proof of all native races being absent.
+
+Developer ID hardened-runtime player tests passed local formats, direct HTTP
+and fragmented MP4, queue/repeat, EOF restart, gain output, and blocked-I/O
+cancellation. Blocked open/read/seek closes stayed under the 500 ms test bound.
+Pausing a stalled read stops the device rather than leaving silent callbacks.
+
+The real application with its opt-in isolated driver also passed local AAC and
+anonymous YouTube playback of `-Siljd9PwKs`, seeking to 5000 seconds before
+continuing and pausing. The network run consumed about 3 MiB through bounded
+ranges rather than fetching the whole track. It used the final playback core
+and hardened signing; the driver build differs from the release by the driver
+itself. The desktop was locked, so visible UI rendering and physical listening
+were not verified. Output-energy tests separately confirmed nonzero samples
+reach the device callback at nonzero volume. Linux/Windows and physical device
+switching were not tested.
+
 ## Run the checks
 
 Use macOS Apple Silicon with Xcode Command Line Tools. Set `CGO_ENABLED=1` when using the MyGo CLI, which otherwise disables cgo.
 
 ```sh
+scripts/build-audio.sh
 go test ./internal/...
 go test -race ./internal/player
 go test ./internal/player -count=5
 go test ./internal/app -run 'Test(SettingsSearchNavigation|ScrubSeeksOnRelease|SpaceAfterOpeningNowPlaying|NowPlayingFrameBudget|BackdropFadeEnds|SessionRestsWhilePaused)$' -count=5
 ```
 
-The player tests run the macOS event loop and use real AVPlayer and libmpv instances. Tests cover MP3, FLAC, ALAC, AAC, Vorbis through libmpv, WavPack fallback, pause, seek, native EOF, queue advance, and repeat. libmpv-specific cases skip when that optional library is absent. Controller tests cover generated seek and pause sequences, missing fallback, stale loads, and polling that stops while paused.
+The player tests run the macOS event loop and the bundled FFmpeg/miniaudio backend. They exercise MP3, FLAC, ALAC, AAC (raw and fragmented MP4), Vorbis, WavPack, fragmented FLAC, pause, seek, EOF, queue advance, and repeat. The optional libmpv fallback has separate cases that skip when that library is absent. Controller tests cover pending seek and pause, missing fallback, stale loads, and polling that stops while paused.
 
 `testdata/seek.wv` is a two-second WavPack conversion of the existing FLAC fixture:
 
@@ -65,8 +89,10 @@ go test ./internal/player -run 'TestNativeNetworkTransport|TestAudioRelay|TestNe
 go test ./internal/plugin -run TestStreamNetworkAuthorization -count=5
 ```
 
-The native test serves checked-in MP3 and WavPack fixtures over a local HTTP server with an authorization header. It drives Player through the byte relay, checks playback progress, pauses, seeks while paused, and resumes. WavPack verifies AVPlayer to optional libmpv fallback. Tests isolate app data through the player package's TestMain. These checks do not establish compatibility with every service or measure network CPU use.
+The native test serves checked-in MP3 and WavPack fixtures over a local HTTP server with an authorization header. It drives Player through the byte relay, checks playback progress, pauses, seeks while paused, and resumes. WavPack and fragmented MP4 now verify the bundled backend without fallback. Tests isolate app data through the player package's TestMain. These checks do not establish compatibility with every service or measure network CPU use.
 
 For hardened-runtime verification, compile the player tests with `go test -c -o /tmp/mygo-lite-network.test ./internal/player`, sign that executable with the release identity and release entitlements, and run `(cd internal/player && /tmp/mygo-lite-network.test -test.run TestNativeNetworkTransport -test.count=5 -test.v)` so the fixture paths resolve. Repeat direct network playback in the signed app before publishing. External HLS, DASH, and playlist playback are unsupported.
 
-Internal indexed-MP4 adaptation has deterministic parser and HTTP tests in `mp4_test.go` and `relay_hls_test.go`. They cover versioned initialization normalization, index offsets, fragment addressing, representation changes, bounded routes, range/HEAD behavior, direct fallback and cancellation. Native acceptance also requires a supported real indexed stream: advancing position, full duration, distant seeking, pause/resume, continuity across segments, and switching tracks during preparation. Parser and HTTP tests alone do not establish native playback or audible acceptance.
+The AVPlayer-specific HLS adapter was removed in 0.4.0. Network tests now exercise fragmented AAC and FLAC directly through the relay. Authorization, redirect, invalid-container and cancellation checks remain.
+
+For isolated real-application network verification, use the `playbackcheck` build with `MM_CHECK_URL` instead of `MM_CHECK_FILE`; `MM_CHECK_SEEK=5000` also verifies a distant seek before sampling. Give it a public test URL or a temporary fixture server, never account credentials. These variables are absent from the normal release's behavior.

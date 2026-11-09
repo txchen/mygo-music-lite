@@ -5,9 +5,11 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -20,7 +22,7 @@ import (
 // native engine and windows. The normal application does not include it.
 func init() {
 	dir, file := os.Getenv("MM_CHECK_DIR"), os.Getenv("MM_CHECK_FILE")
-	if dir == "" || file == "" {
+	if dir == "" || file == "" && os.Getenv("MM_CHECK_URL") == "" {
 		return
 	}
 	for _, name := range []string{"data", "cache"} {
@@ -55,35 +57,50 @@ func (a *app) checkPlayback(dir, file string) {
 		mygo.RunOnMain(mygo.App.Quit)
 	}()
 	fail := func(err error) { samples = append(samples, playbackSample{Mode: "setup", Error: err.Error()}) }
-	file, err := filepath.Abs(file)
-	if err != nil {
-		fail(err)
-		return
-	}
-	mygo.RunOnMain(func() { a.local.AddFolders(filepath.Dir(file)) })
-	deadline := time.Now().Add(15 * time.Second)
-	for a.local.Scanning() && time.Now().Before(deadline) {
-		time.Sleep(50 * time.Millisecond)
-	}
 	var track *music.Track
-	for offset := 0; ; offset += 40 {
-		res, err := a.local.Search("", music.SearchTracks, offset)
+	if target := os.Getenv("MM_CHECK_URL"); target != "" {
+		source := playbackCheckSource{Source: a.local, url: target}
+		mygo.RunOnMain(func() {
+			original := a.pl.Source
+			a.pl.Source = func(id string) music.Source {
+				if id == "playback-check" {
+					return source
+				}
+				return original(id)
+			}
+		})
+		track = &music.Track{ID: "network-check", Source: "playback-check", Name: "Network playback check"}
+	} else {
+		file, err := filepath.Abs(file)
 		if err != nil {
 			fail(err)
 			return
 		}
-		for _, t := range res.Tracks {
-			st, err := a.local.Stream(t.ID, "lossless")
-			if err == nil && st.URL == music.FileURL(file) {
-				copy := t
-				track = &copy
+		mygo.RunOnMain(func() { a.local.AddFolders(filepath.Dir(file)) })
+		deadline := time.Now().Add(15 * time.Second)
+		for a.local.Scanning() && time.Now().Before(deadline) {
+			time.Sleep(50 * time.Millisecond)
+		}
+		for offset := 0; ; offset += 40 {
+			res, err := a.local.Search("", music.SearchTracks, offset)
+			if err != nil {
+				fail(err)
+				return
+			}
+			for _, t := range res.Tracks {
+				st, err := a.local.Stream(t.ID, "lossless")
+				if err == nil && st.URL == music.FileURL(file) {
+					copy := t
+					track = &copy
+					break
+				}
+			}
+			if track != nil || !res.More {
 				break
 			}
 		}
-		if track != nil || !res.More {
-			break
-		}
 	}
+	deadline := time.Now().Add(20 * time.Second)
 	if track == nil {
 		fail(fmt.Errorf("local scan did not find %s", file))
 		return
@@ -100,6 +117,27 @@ func (a *app) checkPlayback(dir, file string) {
 	if !ready {
 		mygo.RunOnMain(func() { fail(fmt.Errorf("playback not ready: %s", a.pl.Err())) })
 		return
+	}
+	if value := os.Getenv("MM_CHECK_SEEK"); value != "" {
+		seconds, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			fail(err)
+			return
+		}
+		mygo.RunOnMain(func() { a.pl.Seek(time.Duration(seconds * float64(time.Second))) })
+		deadline := time.Now().Add(10 * time.Second)
+		seeked := false
+		for time.Now().Before(deadline) {
+			mygo.RunOnMain(func() { seeked = math.Abs(a.pl.Position().Seconds()-seconds) < 2 })
+			if seeked {
+				break
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		if !seeked {
+			fail(fmt.Errorf("distant seek did not complete"))
+			return
+		}
 	}
 	if assertions, err := exec.Command("pmset", "-g", "assertions").Output(); err == nil {
 		os.WriteFile(filepath.Join(dir, "assertions.txt"), assertions, 0600)
@@ -153,4 +191,18 @@ func (a *app) checkPlayback(dir, file string) {
 			return
 		}
 	}
+}
+
+// playbackCheckSource uses the real Player/relay while keeping test URLs out of user data.
+type playbackCheckSource struct {
+	music.Source
+	url string
+}
+
+func (s playbackCheckSource) Info() music.Info {
+	return music.Info{ID: "playback-check", Playback: music.PlaybackStream}
+}
+func (s playbackCheckSource) Can(string) bool { return false }
+func (s playbackCheckSource) Stream(string, string) (*music.Stream, error) {
+	return &music.Stream{URL: s.url}, nil
 }

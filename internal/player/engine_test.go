@@ -34,18 +34,19 @@ func TestNativeTransport(t *testing.T) {
 		name, file string
 		open       func(*music.Stream) (engine, error)
 	}{
-		{"AVPlayer MP3", "seek.mp3", openAVPlayer},
-		{"AVPlayer FLAC", "seek.flac", openAVPlayer},
-		{"AVPlayer ALAC", "seek.m4a", openAVPlayer},
-		{"AVPlayer AAC", "seek-aac.m4a", openAVPlayer},
-		{"libmpv Vorbis", "seek.ogg", openMPV},
+		{"FFmpeg/miniaudio MP3", "seek.mp3", openPortable},
+		{"FFmpeg/miniaudio FLAC", "seek.flac", openPortable},
+		{"FFmpeg/miniaudio ALAC", "seek.m4a", openPortable},
+		{"FFmpeg/miniaudio AAC", "seek-aac.m4a", openPortable},
+		{"FFmpeg/miniaudio Vorbis", "seek.ogg", openPortable},
+		{"FFmpeg/miniaudio WavPack", "seek.wv", openPortable},
+		{"FFmpeg/miniaudio raw AAC", "seek.aac", openPortable},
+		{"FFmpeg/miniaudio fragmented AAC", "seek-aac-frag.m4a", openPortable},
+		{"FFmpeg/miniaudio fragmented FLAC", "seek-flac-frag.m4a", openPortable},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			if c.open == nil {
 				t.Fatal("missing engine")
-			}
-			if c.file == "seek.ogg" && loadMPV() != nil {
-				t.Skip("optional Homebrew libmpv not installed")
 			}
 			path, _ := filepath.Abs(filepath.Join("testdata", c.file))
 			var out engine
@@ -119,7 +120,7 @@ func TestNativeEndAndRepeat(t *testing.T) {
 		name   string
 		repeat RepeatMode
 		mpv    bool
-	}{{"AVPlayer queue", RepeatOff, false}, {"AVPlayer repeat", RepeatOne, false}, {"libmpv queue", RepeatOff, true}, {"libmpv repeat", RepeatOne, true}} {
+	}{{"FFmpeg/miniaudio queue", RepeatOff, false}, {"FFmpeg/miniaudio repeat", RepeatOne, false}, {"libmpv queue", RepeatOff, true}, {"libmpv repeat", RepeatOne, true}} {
 		t.Run(c.name, func(t *testing.T) {
 			if c.mpv && loadMPV() != nil {
 				t.Skip("optional Homebrew libmpv not installed")
@@ -136,7 +137,7 @@ func TestNativeEndAndRepeat(t *testing.T) {
 				p.SetVolume(0)
 				p.repeat = repeat
 				p.openEngine = func(st *music.Stream, _ bool) (engine, error) {
-					open := openAVPlayer
+					open := openPortable
 					if c.mpv {
 						open = openMPV
 					}
@@ -268,7 +269,7 @@ func TestMissingFallbackStops(t *testing.T) {
 	}
 }
 
-// A WavPack file takes the real AVPlayer failure path into libmpv.
+// A failed primary output falls back once to libmpv and plays the track.
 func TestNativeFallback(t *testing.T) {
 	if loadMPV() != nil {
 		t.Skip("optional Homebrew libmpv not installed")
@@ -279,6 +280,12 @@ func TestNativeFallback(t *testing.T) {
 	var p *Player
 	mygo.RunOnMain(func() {
 		p = New(func(fn func()) { mygo.RunOnMain(fn) })
+		p.openEngine = func(st *music.Stream, fallback bool) (engine, error) {
+			if !fallback {
+				return nil, errors.New("primary output unavailable")
+			}
+			return openMPV(st)
+		}
 		p.Quiet = p.post
 		p.Source = func(string) music.Source { return src }
 		p.SetVolume(0)
