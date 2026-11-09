@@ -18,7 +18,7 @@ cask "mygo-music-lite" do
   homepage "https://github.com/txchen/mygo-music-lite"
 
   depends_on arch: :arm64
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "MyGo Music Lite.app"
 end
