@@ -27,20 +27,26 @@ var errDirectAudio = errors.New("network playback supports direct audio files; H
 // audioRelay owns one track's requests. The native engine only sees its opaque
 // loopback route, so redirects and credentials stay inside the Go HTTP boundary.
 type audioRelay struct {
-	url          string
-	target       *url.URL
-	headers      http.Header
-	authorize    func(*url.URL) error
-	ctx          context.Context
-	cancel       context.CancelFunc
-	server       *http.Server
-	transport    *http.Transport
-	client       *http.Client
-	mu           sync.Mutex
-	err          error
-	validationMu sync.Mutex
-	validated    bool
-	validator    string
+	url              string
+	target           *url.URL
+	headers          http.Header
+	authorize        func(*url.URL) error
+	ctx              context.Context
+	cancel           context.CancelFunc
+	server           *http.Server
+	transport        *http.Transport
+	client           *http.Client
+	mu               sync.Mutex
+	err              error
+	validationMu     sync.Mutex
+	validated        bool
+	indexedCandidate bool
+	validator        string
+	validatorHeader  string
+	total            int64
+	hls              *hlsAsset
+	segmentSlots     chan struct{}
+	route            string
 }
 
 func audioURL(raw string) (*url.URL, error) {
@@ -98,7 +104,9 @@ func newAudioRelay(st *music.Stream) (*audioRelay, error) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	r := &audioRelay{target: target, headers: headers, authorize: st.AuthorizeURL, ctx: ctx, cancel: cancel}
-	r.url = "http://" + listener.Addr().String() + "/" + hex.EncodeToString(token)
+	r.route = "/" + hex.EncodeToString(token)
+	r.url = "http://" + listener.Addr().String() + r.route
+	r.segmentSlots = make(chan struct{}, 2)
 	r.transport = &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
 		DialContext:         (&net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
@@ -189,7 +197,19 @@ func (r *audioRelay) Err() error {
 
 func (r *audioRelay) ServeHTTP(w http.ResponseWriter, in *http.Request) {
 	local, _ := url.Parse(r.url)
-	if in.Host != local.Host || in.URL.EscapedPath() != local.EscapedPath() || in.URL.RawQuery != "" || in.URL.ForceQuery || (in.Method != "GET" && in.Method != "HEAD") {
+	if in.Host != local.Host || in.URL.RawPath != "" || in.URL.RawQuery != "" || in.URL.ForceQuery || (in.Method != "GET" && in.Method != "HEAD") {
+		http.NotFound(w, in)
+		return
+	}
+	if r.hls != nil && in.URL.Path != r.route {
+		if !strings.HasPrefix(in.URL.Path, r.route+"/") {
+			http.NotFound(w, in)
+			return
+		}
+		r.serveHLS(w, in, strings.TrimPrefix(in.URL.Path, r.route))
+		return
+	}
+	if in.URL.Path != r.route {
 		http.NotFound(w, in)
 		return
 	}
@@ -331,13 +351,16 @@ func (r *audioRelay) validate(ctx context.Context) error {
 	if !directMedia(data) {
 		return errDirectAudio
 	}
+	r.validatorHeader = "ETag"
 	r.validator = res.Header.Get("ETag")
 	if strings.HasPrefix(r.validator, "W/") {
 		r.validator = ""
 	}
 	if r.validator == "" {
+		r.validatorHeader = "Last-Modified"
 		r.validator = res.Header.Get("Last-Modified")
 	}
+	r.indexedCandidate = len(data) >= 12 && string(data[4:8]) == "ftyp"
 	r.validated = true
 	return nil
 }
