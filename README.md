@@ -1,39 +1,52 @@
-# MyGo Music
+# MyGo Music Lite
 
-A native desktop music player written in Go with [MyGo](https://github.com/egoist/mygo), no WebView. It plays your local files out of the box, and everything else comes from plugins.
+A macOS Apple Silicon fork of [mygo-music](https://github.com/egoist/mygo-music), focused on low CPU use during local playback.
 
-## Features
+## Install
 
-- Local files (MP3, FLAC, Ogg Vorbis, WAV, and ALAC, FLAC or AAC in .m4a and .aac) with tags, covers and `.lrc` lyrics
-- Playlists, liked songs, search, albums and artists
-- Now Playing with lyric stage styles, cover wall, queue, shuffle and repeat
-- Notch player on macOS, tray, media keys
-- Audio cache, fades on pause and seek, loudness normalization
-- Session restore
-- Podcast captions, written down on the device as episodes play
-- English and Simplified Chinese
-- Plugins can add accounts, catalogs, podcasts, stations, comments and pages of their own
+Requires macOS 13 or later on Apple Silicon.
+
+```sh
+brew install --cask txchen/tap/mygo-music-lite
+```
+
+Release bundles are Developer ID signed and notarized. See [release instructions](RELEASING.md) to build and publish one.
+
+## Playback
+
+AVPlayer plays local audio first. If it fails, the app tries Homebrew's libmpv once. libmpv is optional, loaded only when needed, and is not bundled.
+
+```sh
+brew install mpv
+```
+
+Without libmpv, supported files still play through AVPlayer. Unsupported files show an installation hint. The app does not install dependencies automatically.
+
+The library retains folders, tags, covers, playlists, search, ordinary line-synced lyrics, queue controls, session restore, and media keys. Local scanning includes MP3, FLAC, Ogg, Opus, WAV, M4A, AAC, AIFF, WMA, APE, WavPack, and WebM. Actual codec support depends on the engine and macOS version.
+
+There is no PCM processing, spectrum, lyric stage, word animation, speech transcription, persistent audio cache, normalization, fade, or gapless playback. Image caching and manually saving a file remain.
+
+Stream playback is deliberately local-only in this first version. Plugin APIs remain, but native network playback needs separate authentication, redirect, and seeking validation. A new YouTube Music plugin comes later. Navidrome's direct stream URLs fit the existing API, but network playback is not yet enabled or verified in Lite.
+
+The app uses its own identifier, URL scheme, and data directory. It does not import upstream settings or install upstream app updates. The version stays at 0.1.22 to preserve the plugin API version check.
 
 ## Build
 
-```bash
-go tool mygo dev     # run in development
-go tool mygo build   # package into build/
+Requires macOS 13 or later on Apple Silicon, Xcode Command Line Tools, Go as specified in `go.mod`, and Bun. The AVPlayer bridge needs cgo.
+
+```sh
+CGO_ENABLED=1 go tool mygo dev
+CGO_ENABLED=1 go tool mygo build -platform darwin/arm64 -skip-dmg
 go test ./internal/...
 ```
 
-## Podcast captions
+Open `build/darwin-arm64/MyGo Music Lite.app`. It is ad-hoc signed, not notarized.
 
-Episodes are written down on the device as they play, with [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) and Qwen3-ASR, which the app downloads when the listener asks for them. The libraries come from this repository's `sherpa-onnx-<version>` prerelease, which only changes with that version:
-
-```bash
-go run ./scripts/sherpa -sign "Developer ID Application: …"
-gh release create sherpa-onnx-2.0.1 --prerelease --latest=false build/sherpa/*
-```
+See [playback verification](docs/playback-verification.md) for native tests and the CPU measurement command.
 
 ## Plugins
 
-A plugin is a folder in the app's `plugins` directory (Settings > Plugins > + > Show Plugins Folder) with a `plugin.json` and one JavaScript or TypeScript file. Install one with the + in Settings > Plugins from GitHub, by its repository or its address, or from its folder or a zip of it on this computer, or drop the folder in by hand. Remove one from its ⋯ menu there. There's nothing to build, and the same plugin runs on every platform. [`examples/demo-plugin`](examples/demo-plugin) does everything a plugin can with made-up data: copy it to start.
+A plugin is a folder in the app's `plugins` directory (Settings > Plugins > + > Show Plugins Folder) with a `plugin.json` and one JavaScript or TypeScript file. Install one with the + in Settings > Plugins from GitHub, by its repository or its address, or from its folder or a zip of it on this computer, or drop the folder in by hand. Remove one from its ⋯ menu there. The plugin API is retained from upstream. This fork targets macOS Apple Silicon only. [`examples/demo-plugin`](examples/demo-plugin) does everything a plugin can with made-up data: copy it to start.
 
 ```json
 {
@@ -100,7 +113,7 @@ Export a function for each thing the plugin does. Each takes one object of param
 | `likeComment` | `{trackId, commentId, on}` | |
 | `postComment` | `{trackId, text}` | `Comment` |
 | `lyrics` | `{id}` | `{lrc, translation}`, or `{lines}` with timed `words` |
-| `stream` | `{id, quality}` | `{url, type, headers, size, gain, peak}`, where `type` is `mp3`, `flac`, `ogg`, `wav`, `m4a` (ALAC, FLAC or AAC-LC, whole or in fragments as a DASH stream serves it) or `aac` (AAC-LC in ADTS) |
+| `stream` | `{id, quality}` | `{url, type, headers, size, gain, peak}`, where `type` identifies the container. Lite ignores `gain` and `peak`; native engines decide which codecs they can play |
 | `remotePlay` | `{ids, start, position}` | |
 | `remotePause`, `remoteResume` | | |
 | `remoteSeek` | `{position}` | |
@@ -158,7 +171,7 @@ Put the translations in `locales/<language>.json` next to `plugin.json`: `locale
 
 The app translates the plugin's `name`, its settings' `label` and `help`, select option labels and its `navigation` titles with them. Option values are never translated. For what the plugin says itself, such as a page's titles or an error's message, `host.t(text)` answers the translation, or `text` when there's none, and `host.language()` the listener's language, `en` or `zh-CN`. Both follow the listener as they change it, and the page they're on loads again.
 
-With `"playback": "stream"`, the app plays what `stream` answers. With `"playback": "remote"`, the plugin makes the sound itself, or has another program do so, and the app calls the `remote` functions and polls `remoteState`.
+With `"playback": "stream"`, this version plays local file URLs returned by `stream`. Network streams are reserved for a later version. With `"playback": "remote"`, the plugin makes the sound itself, or has another program do so, and the app calls the `remote` functions and polls `remoteState`.
 
 Throw an error with a `code` to say what's wrong: `signIn` prompts the listener to sign in, `setup` sends them to the plugin's settings, `unavailable` means this can't be played, and `unsupported` means the plugin doesn't do this. Any other error shows its message.
 
@@ -168,7 +181,7 @@ Put it in a public GitHub repository, with `plugin.json` at the top. The app tak
 
 Add the topic `mygo-music-plugin` to the repository to have it listed on the [plugins page](https://mygo-music.egoist.dev/plugins).
 
-Link to `mygo-music://install-plugin?repo=owner/repo` for an install button: it opens the app, which downloads the plugin and asks the listener before installing it. The development app (`mygo dev`) answers `mygo-music-dev://` instead.
+Link to `mygo-music-lite://install-plugin?repo=owner/repo` for an install button: it opens the app, which downloads the plugin and asks the listener before installing it. The development app (`mygo dev`) answers `mygo-music-lite-dev://` instead.
 
 ### What a plugin can reach
 
@@ -202,12 +215,13 @@ Everything else takes a permission in `plugin.json`:
   ]
   ```
 
-  `hosts` are hosts or `*.domain`, which the network permission has to reach, or `{setting:key}`, the host of the server a setting names, such as `https://nas.local:5666`, while the network permission reaches it. `*` isn't one. Without `kinds`, they go with both. In `headers`, `{setting:key}` is what the listener filled in and `{storage:key}` what the plugin keeps with `host.storage`, as each is when the request goes out: a token the plugin stores anew goes with the next one, and none is kept in a URL. A header whose value isn't there yet, as before signing in, is left out. The headers a `stream` answers come first. Neither goes on to another host a request is redirected to.
+  `hosts` are hosts or `*.domain`, which the network permission has to reach, or `{setting:key}`, the host of the server a setting names, such as `https://nas.local:5666`, while the network permission reaches it. `*` isn't one. Without `kinds`, they go with both. In `headers`, `{setting:key}` is what the listener filled in and `{storage:key}` what the plugin keeps with `host.storage`, as each is when the request goes out: a token the plugin stores anew goes with the next one, and none is kept in a URL. A header whose value isn't there yet, as before signing in, is left out. The headers a `stream` answers come first. Image and manual-download requests do not forward these headers to another host on redirect. Native network playback is disabled in this version.
 - `"process": ["bin/helper-*", "ffmpeg"]` lists the programs `host.spawn` can start, for what JavaScript can't do: a path from the plugin's folder or absolute, or a name looked up on `PATH`. A path only matches a path and a name only a name, and `*` matches within one folder, as in a glob. `["*"]`, or `true`, asks for any program, which the listener is warned about. The listener has to allow it in Settings first, as a program can do anything they can. Programs end when the plugin does, and once allowed, `fetch` can reach this machine too, to talk to them. Ship one binary per platform and pick it with `host.platform` and `host.arch`.
 
 ## Credits
 
-- [folia-major](https://github.com/chthollyphile/folia-major): the lyric stage animations
+- [mygo-music](https://github.com/egoist/mygo-music) provides the original application and plugin API.
+- [folia-major](https://github.com/chthollyphile/folia-major) inspired the upstream lyric stage, which this fork removes.
 
 ## License
 

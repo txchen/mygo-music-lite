@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	_ "github.com/egoist/mygo/audio/aac"  // AAC in MP4
-	_ "github.com/egoist/mygo/audio/flac" // FLAC in MP4
 	"github.com/egoist/mygo/audio/mp4"
 )
 
@@ -138,21 +136,10 @@ func adtsDuration(r io.ReaderAt, size int64) int64 {
 	return micros / 1000
 }
 
-// adtsPlayable says whether an AAC file is AAC-LC, as the player decodes:
-// what its first frame says.
-func adtsPlayable(r io.ReaderAt) bool {
-	var h [7]byte
-	if _, err := r.ReadAt(h[:], id3v2Size(r)); err != nil {
-		return false
-	}
-	return h[0] == 0xff && h[1]&0xf6 == 0xf0 && h[2]>>6 == 1
-}
-
-// m4aTrack reads an .m4a's sound track, if the player plays it: ALAC, FLAC
-// or AAC-LC.
+// m4aTrack reads container metadata without opening a decoder.
 func m4aTrack(r io.ReaderAt, size int64) (*mp4.Track, bool) {
 	t, err := mp4.ReadTrack(r, size)
-	if err != nil || !t.Decodable() {
+	if err != nil {
 		return nil, false
 	}
 	return t, true

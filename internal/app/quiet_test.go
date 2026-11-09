@@ -76,7 +76,7 @@ func TestQuietComment(t *testing.T) {
 // In the quiet, the lyrics pane and the stage show the top comment, which
 // opens the comments.
 func TestQuietCard(t *testing.T) {
-	for _, pane := range []int{paneLyrics, paneStage} {
+	for _, pane := range []int{paneLyrics} {
 		a, _, _ := quietApp(5 * time.Second)
 		a.nowPlaying, a.npPane = true, pane
 		tt := ui.NewTester(a.view, 1000, 640)

@@ -6,7 +6,6 @@ import (
 	"image/color"
 	"image/draw"
 	"os"
-	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -338,62 +337,6 @@ func TestLikeBurstFrames(t *testing.T) {
 	saveFrame(t, dir, "burst.png", strip)
 }
 
-// With MM_FRAMES set, saves the lyrics stage in each of its styles at
-// moments through a line.
-func TestStageFrames(t *testing.T) {
-	dir := os.Getenv("MM_FRAMES")
-	if dir == "" {
-		t.Skip()
-	}
-	for _, s := range stageStyles {
-		name := "stage.png"
-		if s.id != "" {
-			name = "stage-" + s.id + ".png"
-		}
-		stageFrames(t, s.id, filepath.Join(dir, name))
-	}
-}
-
-func stageFrames(t *testing.T, style, path string) {
-	a := newTestApp()
-	a.settings.StageStyle = style
-	a.pl.Cue([]music.Track{song("7", "海屿你", "马也_Crabbit")})
-	a.pl.SetLyrics(lyrics.FromSource(&music.Lyrics{Lines: []music.LyricLine{
-		{Start: 13010, End: 17790, Translation: "I never show weakness first", Words: []music.LyricWord{
-			{Start: 13010, End: 13670, Text: "从"}, {Start: 13670, End: 14340, Text: "不 "},
-			{Start: 14370, End: 14850, Text: "主"}, {Start: 14850, End: 15460, Text: "动 "},
-			{Start: 15490, End: 15820, Text: "示"}, {Start: 15820, End: 16890, Text: "弱"},
-		}},
-		{Start: 17790, End: 19560, Words: []music.LyricWord{
-			{Start: 17790, End: 17960, Text: "我"}, {Start: 17960, End: 18410, Text: "们"},
-			{Start: 18410, End: 18700, Text: "的"}, {Start: 18700, End: 19170, Text: "过"}, {Start: 19170, End: 19560, Text: "去"},
-		}},
-		{Start: 30560, End: 37140, Text: "曾经的那些发生过的开心和难过", Translation: "The joy and sorrow that once happened"},
-	}}))
-	a.nowPlaying, a.npPane = true, paneStage
-	tt := ui.NewTester(a.view, 1200, 800)
-	tt.SetDark(true)
-	tt.Advance(time.Second)
-	moments := []time.Duration{12900, 13300, 13800, 14600, 15900, 17300, 17900, 18500, 26000}
-	img := tt.Image()
-	cw, ch := img.Bounds().Dx()/3, img.Bounds().Dy()/3
-	grid := image.NewRGBA(image.Rect(0, 0, cw*3, ch*3))
-	for i, m := range moments {
-		a.pl.Seek(m * time.Millisecond)
-		tt.Advance(16 * time.Millisecond)
-		tt.Frame()
-		shot := tt.Image()
-		small := image.NewRGBA(image.Rect(0, 0, cw, ch))
-		for y := range ch {
-			for x := range cw {
-				small.Set(x, y, shot.At(x*3, y*3))
-			}
-		}
-		draw.Draw(grid, image.Rect((i%3)*cw, (i/3)*ch, (i%3+1)*cw, (i/3+1)*ch), small, image.Point{}, draw.Src)
-	}
-	saveFrame(t, filepath.Dir(path), filepath.Base(path), grid)
-}
-
 // coveredSong is a song whose cover is ready, for a look at what its colors
 // do.
 func coveredSong(a *app) music.Track {
@@ -420,48 +363,6 @@ func TestBackdropFrame(t *testing.T) {
 	tt.Advance(2 * time.Second)
 	tt.Frame()
 	saveFrame(t, dir, "backdrop.png", tt.Image())
-}
-
-// With MM_FRAMES set, saves the progress bar's comet at moments, in Now
-// Playing and in the player bar.
-func TestSmokeFrames(t *testing.T) {
-	dir := os.Getenv("MM_FRAMES")
-	if dir == "" {
-		t.Skip()
-	}
-	a := newTestApp()
-	tr := coveredSong(a)
-	a.pl.Cue([]music.Track{tr})
-	a.pl.SetLyrics(nil)
-	a.pl.Hold(75 * time.Second)
-	a.settings.Smoke = true
-	shots := func(name string, dark bool) {
-		tt := ui.NewTester(a.view, 1000, 680)
-		tt.SetDark(dark)
-		tt.Advance(2 * time.Second)
-		tt.Frame()
-		r, ok := tt.Find("Progress")
-		if !ok {
-			t.Fatal("no progress bar")
-		}
-		img := tt.Image()
-		scale := float32(img.Bounds().Dx()) / 1000
-		frac := float32(75.0 / tr.Length().Seconds())
-		cx, cy := int((r.X+r.W*frac)*scale), int((r.Y+r.H/2)*scale)
-		w, h := int(200*scale), int(70*scale)
-		moments := 4
-		strip := image.NewRGBA(image.Rect(0, 0, w, h*moments))
-		for i := range moments {
-			tt.Advance(170 * time.Millisecond)
-			tt.Frame()
-			draw.Draw(strip, image.Rect(0, i*h, w, (i+1)*h), tt.Image(), image.Pt(cx-w*3/4, cy-h*2/3), draw.Src)
-		}
-		saveFrame(t, dir, name+".png", strip)
-	}
-	a.nowPlaying = true
-	shots("smoke-np", true)
-	a.nowPlaying = false
-	shots("smoke-bar", false)
 }
 
 // With MM_FRAMES set, saves the player bar at window widths from the

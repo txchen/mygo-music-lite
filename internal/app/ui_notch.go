@@ -36,7 +36,6 @@ type notch struct {
 	active     bool   // the app is active, when they go unseen over the menu bar
 	polling    bool   // a poll is due
 
-	bars  barState
 	scrub scrubState
 }
 
@@ -408,21 +407,9 @@ func (n *notch) compact(c *ui.Context, tr *music.Track, shown float32) {
 	})
 }
 
-// levels draws the music's levels in the cover's color.
+// levels marks playback without requesting animation frames.
 func (n *notch) levels(c *ui.Context, tr *music.Track, w, h float32, count int) {
-	a := n.a
-	color := ui.RGB(255, 255, 255)
-	if art := a.art.get(sized(tr.Album.ImageURL, 96), false); art != nil && !art.failed {
-		color = art.tint.Mix(white, 0.35)
-	}
-	ui.Box(c).Size(w, h).Draw(func(p *ui.Painter, r ui.Rect) {
-		lv, live := a.pl.Levels()
-		n.bars.step(p.Now(), lv, live)
-		drawBars(p, r, &n.bars, count, color, 2.5)
-		if live || n.bars.group(0, player.Bands) > 0.01 {
-			p.AnimationFrame()
-		}
-	})
+	ui.Icon(c, iconVolume).Size(w, h).TextColor(white)
 }
 
 func (n *notch) expanded(c *ui.Context, tr *music.Track, open, left float32) {

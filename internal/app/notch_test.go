@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
-	"github.com/egoist/mygo/audio"
 	"github.com/egoist/mygo/ui"
 
 	"mygo-music/internal/music"
@@ -26,7 +25,7 @@ func TestNotchGreetsOnce(t *testing.T) {
 	if n.hello {
 		t.Fatal("greeted before the song played")
 	}
-	out := audio.NewPlayer(&silence{})
+	out := &testTransport{}
 	out.SetVolume(0)
 	a.pl.Attach(out)
 	defer out.Close()

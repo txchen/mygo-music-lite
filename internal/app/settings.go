@@ -19,9 +19,6 @@ type settings struct {
 	Language string `json:"language"`
 	// Source is the ID of the source last used.
 	Source string `json:"source,omitempty"`
-	// Captions writes down episodes as they play, for their captions, on this
-	// device, once the listener has the model.
-	Captions bool `json:"captions"`
 	// DisabledPlugins are the IDs of the plugins turned off. All are on until
 	// then, the built-in one included.
 	DisabledPlugins []string `json:"disabledPlugins,omitempty"`
@@ -50,37 +47,15 @@ type settings struct {
 	// closes it back into it: an experiment the listener turns on. Off, it
 	// slides up from the bottom of the window.
 	GrowFromCover bool `json:"growFromCover"`
-	// Smoke makes the progress bars comets trailing smoke as music plays,
-	// for a few percent of a core: the listener turns it on.
-	Smoke bool `json:"smoke"`
-	// LyricsStage shows lyrics on the stage, Folia's style, in Now
-	// Playing, rather than scrolling.
-	LyricsStage bool `json:"lyricsStage"`
-	// StageStyle is how the stage sets its lyrics (stageStyles): empty for
-	// Folia's classic, or the id of another of its visualizers.
-	StageStyle string `json:"stageStyle,omitempty"`
-	// StageSparks throws sparks off each word on the stage as it is sung,
-	// whatever its style.
-	StageSparks bool `json:"stageSparks,omitempty"`
 	// Volume is where the volume was left, from 0 to 1.
 	Volume float64 `json:"volume"`
-	// Normalize evens out the loudness of tracks, by what their source
-	// measured of each.
-	Normalize bool `json:"normalize"`
 	// HotComments shows a song's top comments in its quiet parts, in place of
 	// the lyrics (quietComment), for a source with comments: the listener
 	// turns it on.
 	HotComments bool `json:"hotComments"`
-	// Fog fills Now Playing's backdrop with fog of the cover's color,
-	// rising and swelling with the bass: an experiment the listener turns
-	// on.
-	Fog bool `json:"fog"`
 	// AppIcon is where the app's icon shows on macOS (appIcons); elsewhere
 	// it is always in the notification area.
 	AppIcon string `json:"appIcon"`
-	// CacheMB is how many megabytes the songs kept on disk may take; 0
-	// keeps none.
-	CacheMB int `json:"cacheMB"`
 	// SearchHistory keeps submitted keywords, most recent first.
 	SearchHistory []string `json:"searchHistory,omitempty"`
 
@@ -88,7 +63,7 @@ type settings struct {
 }
 
 func defaultSettings() settings {
-	return settings{Language: i18n.System, NotchActivity: true, Quality: "high", Appearance: "system", Volume: 0.8, Normalize: true, AppIcon: "dock-and-menubar", CacheMB: 2048}
+	return settings{Language: i18n.System, Quality: "lossless", Appearance: "system", Volume: 0.8, AppIcon: "dock-and-menubar"}
 }
 
 func settingsPath() (string, error) {
@@ -149,16 +124,4 @@ var qualityLevels = []struct{ level, label string }{
 	{"standard", N("Standard")},
 	{"high", N("High")},
 	{"lossless", N("Lossless")},
-}
-
-// cacheLimits are the sizes the song cache may take, in megabytes.
-var cacheLimits = []struct {
-	mb    int
-	label string
-}{
-	{0, N("Off")},
-	{1024, N("1 GB")},
-	{2048, N("2 GB")},
-	{5120, N("5 GB")},
-	{10240, N("10 GB")},
 }

@@ -241,7 +241,7 @@ func TestRemotePlaysThroughSource(t *testing.T) {
 	if !reflect.DeepEqual(r.src.played[0], []string{"a", "b", "c"}) || r.src.starts[0] != 0 {
 		t.Errorf("told to play %v from %d", r.src.played[0], r.src.starts[0])
 	}
-	if r.p.out != nil || r.p.stream != nil {
+	if r.p.out != nil {
 		t.Error("it decoded something")
 	}
 	if !r.p.Ready() || !r.p.Playing() {

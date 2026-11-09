@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-
-	"mygo-music/internal/player"
 )
 
 // palette holds the app's colors, for the light and the dark appearance.
@@ -228,54 +226,9 @@ func greeting(now time.Time) string {
 	}
 }
 
-// bars draws n bars of an equalizer in r, from the levels of what plays,
-// smoothed in st between frames; idle bars rest low.
-type barState struct {
-	h    [player.Bands]float32
-	last time.Time
-}
+func clamp01(v float32) float32 { return min(1, max(0, v)) }
 
-func (st *barState) step(now time.Time, target [player.Bands]float32, live bool) {
-	dt := float32(now.Sub(st.last).Seconds())
-	if st.last.IsZero() || dt > 0.2 {
-		dt = 0.016
-	}
-	st.last = now
-	for i := range st.h {
-		tg := target[i]
-		if !live {
-			tg = 0
-		}
-		k := float32(18) // rises fast
-		if tg < st.h[i] {
-			k = 6 // falls slowly
-		}
-		st.h[i] += (tg - st.h[i]) * min(1, k*dt)
-	}
-}
-
-// group returns the mean of bands [from, to).
-func (st *barState) group(from, to int) float32 {
-	var s float32
-	for i := from; i < to; i++ {
-		s += st.h[i]
-	}
-	return s / float32(to-from)
-}
-
-func drawBars(p *ui.Painter, r ui.Rect, st *barState, n int, color ui.Color, minH float32) {
-	gap := r.W / float32(n) * 0.38
-	w := (r.W - gap*float32(n-1)) / float32(n)
-	per := player.Bands / n
-	for i := range n {
-		// Shape the response: low bands are loud already.
-		v := st.group(i*per, (i+1)*per)
-		v = v * v * 1.15
-		h := max(minH, min(r.H, r.H*v))
-		x := r.X + float32(i)*(w+gap)
-		p.Fill(ui.Rect{X: x, Y: r.Y + (r.H-h)/2, W: w, H: h}, color, w/2)
-	}
-}
+func lerp(a, b, t float32) float32 { return a + (b-a)*t }
 
 // segmented is a segmented control as AppKit draws one: segments of one
 // width in a small gray track, divided by hairlines, the one chosen raised

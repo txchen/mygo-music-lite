@@ -2,13 +2,10 @@ package player
 
 import (
 	"errors"
-	"math"
 	"math/rand/v2"
-	"os"
 	"time"
 
 	"github.com/egoist/mygo"
-	"github.com/egoist/mygo/audio"
 
 	"mygo-music/internal/i18n"
 	"mygo-music/internal/lyrics"
@@ -37,11 +34,6 @@ type Player struct {
 	Failed func(source string, err error)
 	// Quality returns the quality to ask sources for, as the settings say.
 	Quality func() string
-	// Normalize reports whether to even out the loudness of tracks, as
-	// the settings say.
-	Normalize func() bool
-	// Cache keeps the songs played, if set.
-	Cache *Cache
 	// Changed, if set, hears that what plays, where it is or whether it
 	// plays changed.
 	Changed func()
@@ -61,29 +53,22 @@ type Player struct {
 	feeding  bool // the feed is asked
 	awaiting bool // at the queue's end, for what the feed gives
 
-	track   *music.Track
-	out     *audio.Player
-	stream  stream
-	watch   *watched // stream, as out plays it
-	info    *music.Stream // what the current track streams
-	fade    fader
-	gain    float64 // the current track's normalizing gain
-	loading bool
-	playing bool // what the listener wants: false while paused
-	err     string
-	gen     int // counts loads, to drop the results of stale ones
+	track      *music.Track
+	out        Transport
+	info       *music.Stream // what the current track streams
+	openEngine func(*music.Stream, bool) (engine, error)
+	engineLoad engineLoad
+	polling    bool
+	loading    bool
+	playing    bool // what the listener wants: false while paused
+	err        string
+	gen        int // counts loads, to drop the results of stale ones
 
 	lyrics       []lyrics.Line
 	lyricsLoaded bool
 
 	// pending holds a seek asked for while the track loads.
 	pending time.Duration
-	// A seek playing fades out, then lands, then fades in: meanwhile the
-	// position is where it goes.
-	seeking bool
-	seekTo  time.Duration
-	seekGen int
-
 	// remote is set while the current track is a PlaybackRemote source's,
 	// which plays it elsewhere: see remote.go.
 	remote *remote
@@ -98,16 +83,12 @@ type Player struct {
 
 	recorded string // the track last told its source it played
 
-	ahead *ahead // the next track's audio, asked for before its turn
 }
 
 func New(post func(func())) *Player {
-	p := &Player{post: post, at: -1, volume: 0.8, gain: 1}
+	p := &Player{post: post, at: -1, volume: 0.8}
 	p.after = func(d time.Duration, fn func()) { time.AfterFunc(d, fn) }
 	p.now = time.Now
-	// Music, mixed far enough ahead to play on while macOS keeps the app
-	// waiting, as it does while its appearance changes.
-	audio.SetLatency(audio.LatencyPlayback)
 	// The media keys, and the controls of Control Center.
 	mygo.NowPlaying.OnCommand(func(cmd mygo.MediaCommand, pos time.Duration) {
 		switch cmd {
@@ -366,11 +347,13 @@ func (p *Player) Playing() bool { return p.playing }
 // Loading reports whether the current track is on its way: loading, or
 // waiting for the next of its bytes, after a seek past what has come in.
 func (p *Player) Loading() bool {
-	return p.loading || p.awaiting || p.watch != nil && p.watch.starved()
+	return p.loading || p.awaiting
 }
 
 // Ready reports whether the current track has loaded, to play.
-func (p *Player) Ready() bool { return p.out != nil || p.remote != nil && p.remote.started }
+func (p *Player) Ready() bool {
+	return p.out != nil && !p.loading || p.remote != nil && p.remote.started
+}
 
 // Err returns why the current track did not play, or "".
 func (p *Player) Err() string { return p.err }
@@ -383,16 +366,6 @@ func (p *Player) Repeat() RepeatMode { return p.repeat }
 
 // Lyrics returns the current track's lyrics, and whether they have loaded.
 func (p *Player) Lyrics() ([]lyrics.Line, bool) { return p.lyrics, p.lyricsLoaded }
-
-// Downloaded returns the share of the current track downloaded so far, or
-// false before it has started to.
-func (p *Player) Downloaded() (float64, bool) {
-	if p.stream == nil {
-		return 0, false
-	}
-	dl, _ := p.stream.source()
-	return dl.Progress(), true
-}
 
 // PlayOrder returns the queue's indices in play order, and where the
 // current track is among them, -1 for none.
@@ -440,140 +413,76 @@ func (p *Player) Jump(i int) {
 	}
 }
 
-// TogglePlay pauses, fading out, or plays, fading in.
+// TogglePlay pauses or resumes the current engine without processing PCM.
 func (p *Player) TogglePlay() {
 	if p.remote != nil && p.remote.started {
 		p.remoteToggle()
 		return
 	}
+	if p.loading {
+		p.playing = !p.playing
+		p.sync()
+		return
+	}
 	if p.out == nil {
-		switch {
-		case p.loading:
-			// It plays once loaded, or not.
-			p.playing = !p.playing
-			p.sync()
-		case len(p.order) > 0:
-			// Again, as for a track that couldn't play.
+		if len(p.order) > 0 {
 			p.loadSkipping(max(p.at, 0), 0, stay, true, p.pending)
 		}
 		return
 	}
-	out := p.out
+	p.playing = !p.playing
 	if p.playing {
-		p.playing = false
-		p.fade.fade(0, fadeOut, func() {
-			p.post(func() {
-				if p.out == out && !p.playing {
-					out.Pause()
-					p.sync()
-				}
-			})
-		})
-		p.sync()
-		return
-	}
-	p.playing = true
-	p.record()
-	if !p.seeking && !out.Playing() {
-		if out.Position() >= out.Duration()-time.Second {
-			out.Seek(0)
+		if d := p.out.Duration(); d > 0 && p.out.Position() >= d-time.Millisecond {
+			p.out.Seek(0)
 		}
-		out.Play()
+		p.out.Play()
+		p.record()
+		p.pollEngine()
+	} else {
+		p.out.Pause()
 	}
-	p.fade.fade(1, fadeIn, nil)
 	p.sync()
 }
 
-// seekGap is how long a seek waits for what plays to fade out, which the
-// audio player does over 5 ms, as it pauses: within the next buffer or
-// two it sends the system.
-const seekGap = 30 * time.Millisecond
-
-// Seek moves to t. Playing, it pauses and plays again around the jump,
-// which the audio player fades over a few milliseconds, rather than
-// cutting from one sound to the other with a click.
+// Seek preserves the listener's pause/play intent while the engine seeks.
 func (p *Player) Seek(t time.Duration) {
+	t = max(0, t)
+	if d := p.Duration(); d > 0 {
+		t = min(t, d)
+	}
 	if p.remote != nil && p.remote.started {
 		p.remoteSeek(t)
 		return
 	}
-	if p.out == nil {
+	if p.out == nil || p.loading {
 		p.pending = t
 		return
 	}
-	out := p.out
-	// One past what has come in waits for it: a frame once that would show.
-	p.after(seekGap+starvedAfter+20*time.Millisecond, func() { p.post(func() {}) })
-	// Paused, it jumps at once; but a seek on its way paused it only for
-	// the jump, and this one takes its place, playing on from there.
-	if !out.Playing() && !p.seeking {
-		out.Seek(t)
-		p.sync()
-		return
-	}
-	p.seekGen++
-	gen := p.seekGen
-	p.seeking, p.seekTo = true, t
-	out.Pause()
-	time.AfterFunc(seekGap, func() {
-		p.post(func() {
-			if gen != p.seekGen || p.out != out {
-				return
-			}
-			p.seeking = false
-			out.Seek(t)
-			if p.playing || !p.fade.silent() {
-				out.Play()
-			}
-			p.sync()
-		})
-	})
+	p.out.Seek(t)
 	p.sync()
 }
 
 func (p *Player) SetVolume(v float64) {
-	p.volume = v
+	p.volume = min(1, max(0, v))
 	p.applyGain()
 	if p.remote != nil {
 		p.remoteVolume(v)
 	}
 }
 
-// applyGain sets the volume of what plays: the listener's, which the ear
-// hears in powers, and the track's gain, if normalizing.
+// applyGain keeps the existing perceptual volume curve, without normalization.
 func (p *Player) applyGain() {
-	g := p.volume * p.volume
-	if p.Normalize != nil && p.Normalize() {
-		g *= p.gain
+	if p.out != nil {
+		p.out.SetVolume(p.volume * p.volume)
 	}
-	p.fade.setGain(g)
-}
-
-// normPreamp lifts normalized tracks, which their gains bring to the quiet
-// loudness of ReplayGain, nearer to how loud music plays elsewhere.
-const normPreamp = 4
-
-// normGain is the gain that brings a track as loud as others, as its source
-// measured it, but never so loud that its peaks would clip.
-func normGain(st *music.Stream) float64 {
-	if st == nil || st.Gain == 0 && st.Peak == 0 {
-		return 1
-	}
-	g := math.Pow(10, (st.Gain+normPreamp)/20)
-	if st.Peak > 0 {
-		g = min(g, 1/st.Peak)
-	}
-	return g
 }
 
 func (p *Player) Position() time.Duration {
 	switch {
 	case p.remote != nil && p.remote.started:
 		return p.remotePosition()
-	case p.out == nil:
+	case p.out == nil || p.loading:
 		return p.pending
-	case p.seeking:
-		return p.seekTo
 	}
 	return p.out.Position()
 }
@@ -590,26 +499,19 @@ func (p *Player) Duration() time.Duration {
 	return p.out.Duration() // a source that didn't say
 }
 
-// Levels returns the spectrum of what plays now.
-func (p *Player) Levels() ([Bands]float32, bool) {
-	if p.stream == nil || p.out == nil || !p.playing {
-		return [Bands]float32{}, false
+func (p *Player) stop() {
+	if p.out != nil {
+		p.out.Close()
 	}
-	_, spec := p.stream.source()
-	frame := int64(p.Position().Seconds() * float64(p.stream.SampleRate()))
-	return spec.at(frame)
+	p.out, p.info, p.remote = nil, nil, nil
+	p.polling = false
 }
 
-func (p *Player) stop() {
-	if out := p.out; out != nil {
-		// Paused first, it fades out over a few milliseconds, rather than
-		// stopping with a click.
-		out.Pause()
-		time.AfterFunc(100*time.Millisecond, out.Close)
-	}
-	p.out, p.stream, p.watch, p.info, p.remote = nil, nil, nil, nil, nil
-	p.seeking = false
-	p.fade.attach(nil, 1)
+// Close releases native audio and invalidates pending loads and timers.
+func (p *Player) Close() {
+	p.gen++
+	p.stop()
+	p.loading, p.playing = false, false
 }
 
 // Which way a load goes past a track that can't play: on to the next, back to
@@ -690,50 +592,27 @@ func (p *Player) loadSkipping(at, skipped, dir int, play bool, from time.Duratio
 	if p.Quality != nil {
 		quality = p.Quality()
 	}
-	pre := p.takeAhead(t, quality)
 	go func() {
-		info, s, err := p.open(src, t, quality, pre)
+		var info *music.Stream
+		var err error
+		if src == nil {
+			err = errNoSource
+		} else {
+			info, err = src.Stream(t.ID, quality)
+			if err == nil && (info == nil || info.URL == "") {
+				err = music.ErrUnavailable
+			}
+		}
 		p.post(func() {
 			if gen != p.gen {
-				if s != nil {
-					s.Close()
-				}
 				return
 			}
-			p.loading = false
 			if err != nil {
+				p.loading = false
 				p.loadFailed(t.Source, err, at, skipped, dir)
 				return
 			}
-			p.stream, p.info = s, info
-			p.gain = normGain(info)
-			p.watch = &watched{stream: s, now: p.now, ended: func() { p.post(func() {}) }}
-			p.out = audio.NewPlayer(p.watch)
-			// From its middle, as a session picked up again, it fades in.
-			level := 1.0
-			if p.pending > 0 {
-				level = 0
-			}
-			p.fade.attach(p.out, level)
-			p.applyGain()
-			p.out.OnEnd(func() {
-				p.post(func() {
-					if gen == p.gen {
-						p.ended()
-					}
-				})
-			})
-			if p.pending > 0 {
-				p.out.Seek(p.pending)
-				p.pending = 0
-			}
-			if p.playing {
-				p.out.Play()
-				p.fade.fade(1, fadeIn, nil)
-				p.record()
-			}
-			p.sync()
-			p.getAhead(quality)
+			p.startEngine(info, engineLoad{at: at, skipped: skipped, dir: dir})
 		})
 	}()
 }
@@ -818,76 +697,6 @@ func errorText(err error) string {
 
 var errNoSource = errors.New("player: no such source")
 
-// open opens track t's audio at quality: what was asked for ahead of it, if
-// that worked; or kept in the cache, or else a file on disk, played from
-// there, or else streamed into the cache, and kept once it has all come in.
-// What failed ahead is asked for again: it may have been a moment's.
-func (p *Player) open(src music.Source, t music.Track, quality string, pre *ahead) (*music.Stream, stream, error) {
-	if src == nil {
-		if pre != nil {
-			pre.close()
-		}
-		return nil, nil, errNoSource
-	}
-	var dl *download
-	var info *music.Stream
-	ok := false
-	if pre != nil {
-		<-pre.done
-		if pre.err == nil {
-			info, dl, ok = pre.info, pre.dl, true
-			if dl == nil {
-				path, _ := music.PathOf(info.URL)
-				var err error
-				if dl, err = openFile(path); err != nil {
-					return nil, nil, err
-				}
-			}
-		}
-	}
-	if !ok {
-		dl, info, ok = p.Cache.lookup(t.Source, t.ID, quality)
-	}
-	if !ok {
-		var err error
-		info, err = src.Stream(t.ID, quality)
-		if err != nil {
-			return nil, nil, err
-		}
-		if info == nil {
-			return nil, nil, music.ErrUnavailable
-		}
-		if path, isFile := music.PathOf(info.URL); isFile {
-			dl, err = openFile(path)
-			if err != nil {
-				return nil, nil, err
-			}
-		} else {
-			dl = p.Cache.download(t.Source, t.ID, quality, info)
-		}
-	}
-	s, err := openStream(dl, t.Duration)
-	if err != nil {
-		dl.Close()
-		return nil, nil, err
-	}
-	return info, s, nil
-}
-
-// openFile opens a song on disk as a download that has all of it in.
-func openFile(path string) (*download, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	info, err := f.Stat()
-	if err != nil {
-		f.Close()
-		return nil, err
-	}
-	return opened(f, info.Size()), nil
-}
-
 // Session is where playback was left, to pick up again.
 type Session struct {
 	Queue    []music.Track `json:"queue"`
@@ -932,27 +741,4 @@ func (p *Player) Restore(s Session) {
 	p.queue, p.order = s.Queue, s.Order
 	p.shuffle, p.repeat = s.Shuffle, s.Repeat%3
 	p.loadSkipping(s.At, 0, stay, false, time.Duration(s.Position)*time.Millisecond)
-}
-
-// Audio is the current track's sound, opened apart from what plays by OpenAudio:
-// interleaved stereo at its rate, read as it downloads.
-type Audio interface {
-	SampleRate() int
-	Channels() int
-	Read(dst []float32) (int, error)
-	// SetPosition goes to a frame, of SampleRate a second.
-	SetPosition(frame int64) error
-	Close() error
-}
-
-// OpenAudio opens the current track's sound again, for decoding apart from what
-// plays, as for transcribing an episode. It reads the same download, waiting for
-// what has not come in, and fails once the track changes, or for a track that
-// plays elsewhere. It works on any goroutine once opened; close it when done.
-func (p *Player) OpenAudio() (Audio, error) {
-	if p.stream == nil || p.track == nil {
-		return nil, errors.New("player: nothing loaded")
-	}
-	dl, _ := p.stream.source()
-	return openShared(dl, p.track.Duration)
 }

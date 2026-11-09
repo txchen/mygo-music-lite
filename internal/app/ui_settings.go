@@ -5,7 +5,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/plugins/glass"
@@ -25,10 +24,8 @@ func (a *app) openSettings() {
 	if a.settingsWin != nil {
 		a.settingsWin.Show()
 		a.settingsWin.Focus()
-		a.measureCache()
 		return
 	}
-	a.measureCache()
 	a.settingsWin = mygo.NewWindow(mygo.WindowOptions{
 		Title:     T("Settings"),
 		Width:     780,
@@ -420,52 +417,9 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 				}
 			})
 		}
-		row(T("Even Out Loudness"), T("Adjust each song's volume by what its plugin measured of it, for them to sound as loud as each other"), func() {
-			if ui.Switch(c.Key("normalize"), &s.Normalize).Label(T("Even Out Loudness")).Changed() {
-				a.pl.SetVolume(a.volume)
-				a.changed()
-			}
-		})
 	})
-
-	add("cache", T("Cache"), iconDatabase, func(row settingsRow, block settingsBlock) {
-		row(T("Song Cache"), Tf("Songs from elsewhere are kept here to play again at once, without the network. %s", a.cacheUsage()), func() {
-			labels := make([]string, len(cacheLimits))
-			at := 2
-			for i, l := range cacheLimits {
-				labels[i] = l.label
-				if l.mb == s.CacheMB {
-					at = i
-				}
-			}
-			if i, ok := choice(c, "cache", T("Song Cache"), labels, at); ok {
-				s.CacheMB = cacheLimits[i].mb
-				a.changed()
-				a.applyCacheLimit()
-			}
-		})
-		row(T("Clear the Cache"), T("Delete all the songs kept here"), func() {
-			if ui.Button(c.Key("clear-cache"), T("Clear")).Disabled(a.cacheUsed <= 0).Clicked() {
-				a.clearCache()
-			}
-		})
-	})
-
-	if a.captionsShown() && a.anyCan("shows") {
-		add("podcasts", T("Podcasts"), iconPodcast, func(row settingsRow, block settingsBlock) { a.captionSettings(row, c) })
-	}
 
 	add("experiments", T("Experiments"), iconFlask, func(row settingsRow, block settingsBlock) {
-		row(T("Smoke on the Progress Bar"), T("The progress bar turns into a light trailing smoke, moving with the music. Uses a little more power."), func() {
-			if ui.Switch(c.Key("smoke"), &s.Smoke).Label(T("Smoke on the Progress Bar")).Changed() {
-				a.changed()
-			}
-		})
-		row(T("Fog Backdrop"), T("Now Playing's backdrop turns into fog in the cover's colors, rising with the bass. Still being polished; uses a little more power."), func() {
-			if ui.Switch(c.Key("fog"), &s.Fog).Label(T("Fog Backdrop")).Changed() {
-				a.changed()
-			}
-		})
 		row(T("Grow From the Cover"), T("Now Playing opens out of the cover in the player bar and shrinks back into it, rather than sliding up from the bottom"), func() {
 			if ui.Switch(c.Key("grow-from-cover"), &s.GrowFromCover).Label(T("Grow From the Cover")).Changed() {
 				a.changed()
@@ -473,31 +427,6 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 		})
 	})
 
-	if a.updates {
-		add("updates", T("Updates"), iconRefresh, func(row settingsRow, block settingsBlock) {
-			desc := T("Check for a new version once a day")
-			if t := lastUpdateCheck(); !t.IsZero() {
-				desc = Tf("Check for a new version once a day. Last checked: %s", i18n.Ago(t, time.Now()))
-			}
-			row(T("Check for Updates Automatically"), desc, func() {
-				on := updateChecks()
-				if ui.Switch(c.Key("update-checks"), &on).Label(T("Check for Updates Automatically")).Changed() {
-					setUpdateChecks(on)
-				}
-			})
-			row(T("Download and Install Automatically"), T("Download new versions in the background, to take effect the next time the app opens"), func() {
-				on := updateDownloads()
-				if ui.Switch(c.Key("update-downloads"), &on).Label(T("Download and Install Automatically")).Disabled(!updateChecks()).Changed() {
-					setUpdateDownloads(on)
-				}
-			})
-			row(Tf("Current Version %s", mygo.App.Version()), "", func() {
-				if ui.Button(c.Key("check-updates"), T("Check for Updates")).Clicked() {
-					checkForUpdates()
-				}
-			})
-		})
-	}
 	return sections
 }
 
