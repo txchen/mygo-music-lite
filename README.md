@@ -26,9 +26,9 @@ The library retains folders, tags, covers, playlists, search, ordinary line-sync
 
 There is no PCM processing, spectrum, lyric stage, word animation, speech transcription, persistent audio cache, normalization, fade, or gapless playback. Image caching and manually saving a file remain.
 
-Stream playback is deliberately local-only in this first version. Plugin APIs remain, but native network playback needs separate authentication, redirect, and seeking validation. A new YouTube Music plugin comes later. Navidrome's direct stream URLs fit the existing API, but network playback is not yet enabled or verified in Lite.
+Native playback supports local audio files only. Plugin APIs remain, but native network playback is disabled.
 
-The app uses its own identifier, URL scheme, and data directory. It does not import upstream settings or install upstream app updates. The version stays at 0.1.22 to preserve the plugin API version check.
+The app uses its own identifier, URL scheme, and data directory. It does not import upstream settings or install upstream app updates. Lite releases have their own version. See [differences from upstream](docs/fork-changes.md) for the playback changes and plugin compatibility limits.
 
 ## Build
 
@@ -130,7 +130,7 @@ Of the `playlists`, those with `mine` are the listener's own, listed under My Pl
 
 `navigation` is the plugin's sidebar, in its order. An entry opens a `browse` page of its own by `page`, or one of the app's by `builtin`: `home`, `liked`, `savedAlbums`, `stations` or `shows`, which can be given a `title`. Without `navigation`, the sidebar has an entry for each of the app's pages the plugin can do. Up to four stations show as a switch over one card, and more as a grid.
 
-`minAppVersion` is the oldest version of MyGo Music the plugin works with. An older one won't install it, and says to update first. Versions before 0.1.8 don't read it.
+`minAppVersion` retains its upstream JSON name. Lite checks it against a fixed upstream plugin compatibility baseline of `0.1.22`, independently of its app release version, including in development. Requirements above `0.1.22` and malformed versions are rejected. Passing this check does not guarantee every plugin feature works in Lite. See [plugin compatibility](docs/fork-changes.md#plugin-compatibility).
 
 ### Setting controls
 
@@ -171,7 +171,7 @@ Put the translations in `locales/<language>.json` next to `plugin.json`: `locale
 
 The app translates the plugin's `name`, its settings' `label` and `help`, select option labels and its `navigation` titles with them. Option values are never translated. For what the plugin says itself, such as a page's titles or an error's message, `host.t(text)` answers the translation, or `text` when there's none, and `host.language()` the listener's language, `en` or `zh-CN`. Both follow the listener as they change it, and the page they're on loads again.
 
-With `"playback": "stream"`, this version plays local file URLs returned by `stream`. Network streams are reserved for a later version. With `"playback": "remote"`, the plugin makes the sound itself, or has another program do so, and the app calls the `remote` functions and polls `remoteState`.
+With `"playback": "stream"`, this version plays local file URLs returned by `stream`. Native network streams are disabled. With `"playback": "remote"`, the plugin makes the sound itself, or has another program do so, and the app calls the `remote` functions and polls `remoteState`.
 
 Throw an error with a `code` to say what's wrong: `signIn` prompts the listener to sign in, `setup` sends them to the plugin's settings, `unavailable` means this can't be played, and `unsupported` means the plugin doesn't do this. Any other error shows its message.
 

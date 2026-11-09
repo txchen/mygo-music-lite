@@ -2,7 +2,7 @@
 
 Use macOS Apple Silicon, Xcode Command Line Tools, Go from `go.mod`, Bun, and authenticated GitHub CLI. The Developer ID certificate and its private key must be in the signing keychain. Store notarization credentials there with `xcrun notarytool store-credentials` first.
 
-The app version remains 0.1.22 for the plugin API contract. Release tags use `v0.1.22`. Do not replace an asset already published under that tag.
+Lite releases have their own version, independent of the upstream plugin compatibility baseline. This release uses app version `0.2.0` and tag `v0.2.0`. Do not replace an asset already published under that tag.
 
 ## Prepare the signed submission
 
@@ -10,23 +10,23 @@ Commit the source to publish, then run:
 
 ```sh
 go test ./internal/...
-scripts/release-app.sh prepare 0.1.22 \
+scripts/release-app.sh prepare 0.2.0 \
   'Developer ID Application: ROBOPUNK FOUNDATION (68S3R4UWP6)' \
   "$HOME/Library/Keychains/login.keychain-db"
 ```
 
-The script creates `build/release/0.1.22/`, signs with hardened runtime, checks the bundle version, identifier, arm64 architecture, and Mach-O minimum OS version, and saves `submission.zip` and its SHA-256 checksum. It refuses an existing release directory. The only entitlement disables library validation so the optional Homebrew libmpv can load. The embedded moejs interpreter does not need JIT entitlements. libmpv is not bundled.
+The script creates `build/release/0.2.0/`, signs with hardened runtime, checks the bundle version, identifier, arm64 architecture, and Mach-O minimum OS version, and saves `submission.zip` and its SHA-256 checksum. It refuses an existing release directory. The only entitlement disables library validation so the optional Homebrew libmpv can load. The embedded moejs interpreter does not need JIT entitlements. libmpv is not bundled.
 
 ## Notarize and staple
 
 ```sh
-scripts/release-app.sh notarize 0.1.22 robopunk-notary \
+scripts/release-app.sh notarize 0.2.0 robopunk-notary \
   "$HOME/Library/Keychains/login.keychain-db"
 ```
 
 The command verifies the submission hash, submits it, saves the submission ID in `submission.json`, and waits for Apple's result. It saves Apple's log and checks its submission ID and archive hash. Rerun the command after an interruption to resume that submission. If interruption happens before the receipt is saved, recover the ID with `xcrun notarytool history --keychain-profile robopunk-notary --keychain "$HOME/Library/Keychains/login.keychain-db"` and save the matching receipt as `submission.json` before rerunning.
 
-After acceptance, the script extracts the original submission, staples and validates the ticket, checks Gatekeeper and the signature, then creates `mygo-music-lite-0.1.22-darwin-arm64.zip` and its `.sha256` file. It refuses to overwrite a final archive. Keep the whole release directory as the release record.
+After acceptance, the script extracts the original submission, staples and validates the ticket, checks Gatekeeper and the signature, then creates `mygo-music-lite-0.2.0-darwin-arm64.zip` and its `.sha256` file. It refuses to overwrite a final archive. Keep the whole release directory as the release record.
 
 Open the stapled app from the final zip and check local playback, optional mpv fallback, and a plugin before publishing. Signing and notarization do not verify those behaviors.
 
@@ -35,13 +35,13 @@ Open the stapled app from the final zip and check local playback, optional mpv f
 Create the tag on the tested source commit and publish only the final zip and checksum:
 
 ```sh
-git tag v0.1.22
-git push origin main v0.1.22
-gh release create v0.1.22 \
-  build/release/0.1.22/mygo-music-lite-0.1.22-darwin-arm64.zip \
-  build/release/0.1.22/mygo-music-lite-0.1.22-darwin-arm64.zip.sha256 \
-  --title 'MyGo Music Lite 0.1.22' --notes-file /path/to/release-notes.md
-scripts/render-cask.sh 0.1.22 > /path/to/homebrew-tap/Casks/mygo-music-lite.rb
+git tag v0.2.0
+git push origin main v0.2.0
+gh release create v0.2.0 \
+  build/release/0.2.0/mygo-music-lite-0.2.0-darwin-arm64.zip \
+  build/release/0.2.0/mygo-music-lite-0.2.0-darwin-arm64.zip.sha256 \
+  --title 'MyGo Music Lite 0.2.0' --notes-file /path/to/release-notes.md
+scripts/render-cask.sh 0.2.0 > /path/to/homebrew-tap/Casks/mygo-music-lite.rb
 ```
 
 Review and commit the cask in `txchen/homebrew-tap`, then push it. Verify installation from the public release:

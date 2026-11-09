@@ -226,7 +226,6 @@ func (a *app) makeSources() {
 	builtIn := newLibrary(a.local)
 	a.allLibs = []*library{builtIn}
 	plugin.SetOpenURL(mygo.Shell.OpenExternal)
-	plugin.SetAppVersion(mygo.App.Version())
 	plugin.SetWebSignIn(a.webSignIn)
 	a.plugins = plugin.Discover(pluginsDir(), userDataDir("plugin-data"))
 	a.headers = &headerPlugins{}

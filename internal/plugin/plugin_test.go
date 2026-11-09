@@ -625,31 +625,34 @@ export function signIn() {
 	}
 }
 
-// A plugin that needs a newer app than this doesn't load, so it can't be
-// installed either; with no version of its own, as in development, it does.
+// Lite rejects plugins above its fixed compatibility baseline even when the app release is newer or unversioned.
 func TestMinAppVersion(t *testing.T) {
-	defer SetAppVersion(appVersion)
-	dir, data := write(t, `{"id":"x","name":"X","minAppVersion":"0.1.10"}`, `export function suggest() { return []; }`)
 	for _, c := range []struct {
-		app   string
-		loads bool
+		minimum string
+		loads   bool
 	}{
-		{"0.1.9", false},
-		{"0.1.10", true},
-		{"0.2.0", true},
 		{"", true},
-		{"dev", true},
+		{"0.1.8", true},
+		{"0.1.21", true},
+		{"0.1.22", true},
+		{"0.1.23", false},
+		{"0.2.0", false},
 	} {
-		SetAppVersion(c.app)
-		_, err := Load(dir, data)
-		var needs *NeedsNewerApp
-		if c.loads && err != nil || !c.loads && (!errors.As(err, &needs) || needs.Version != "0.1.10") {
-			t.Errorf("app %q: %v", c.app, err)
-		}
+		t.Run(c.minimum, func(t *testing.T) {
+			dir, data := write(t, `{"id":"x","name":"X","minAppVersion":"`+c.minimum+`"}`, `export function suggest() { return []; }`)
+			_, err := Load(dir, data)
+			var needs *NeedsNewerApp
+			if c.loads && err != nil || !c.loads && (!errors.As(err, &needs) || needs.Version != c.minimum) {
+				t.Errorf("minimum %q: %v", c.minimum, err)
+			}
+		})
 	}
-	SetAppVersion("1.0.0")
-	bad, data := write(t, `{"id":"x","minAppVersion":"soon"}`, `export function suggest() { return []; }`)
-	if _, err := Load(bad, data); err == nil {
+}
+
+// A malformed compatibility requirement cannot bypass plugin loading checks.
+func TestMinAppVersionMalformed(t *testing.T) {
+	dir, data := write(t, `{"id":"x","minAppVersion":"soon"}`, `export function suggest() { return []; }`)
+	if _, err := Load(dir, data); err == nil {
 		t.Error("loaded with a minAppVersion that isn't a version")
 	}
 }
