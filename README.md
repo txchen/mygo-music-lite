@@ -26,7 +26,7 @@ The library retains folders, tags, covers, playlists, search, ordinary line-sync
 
 There is no PCM processing, spectrum, lyric stage, word animation, speech transcription, persistent audio cache, normalization, fade, or gapless playback. Image caching and manually saving a file remain.
 
-Direct HTTP(S) audio plays through a per-track loopback relay. It forwards byte ranges for seeking, applies plugin headers only to the original origin, and checks plugin network permissions on redirects. HLS, DASH, and playlist URLs are unsupported. Network sources need permission for the audio host and every redirect host, including CDNs.
+Direct HTTP(S) audio plays through a per-track loopback relay. It forwards byte ranges for seeking, applies plugin headers only to the original origin, and checks plugin network permissions on redirects. For supported indexed fragmented MP4 audio, the relay generates an internal HLS playlist so AVPlayer can start and seek without scanning the entire file. External HLS, DASH, and playlist URLs remain unsupported. Network sources need permission for the audio host and every redirect host, including CDNs.
 
 The relay reads a small format probe and streams bytes on native-engine demand. It does not decode, transcode, or save a complete track. Paused engines can retain or finish filling their own buffers. Playback stops when a network read stalls for 30 seconds. Native codec support still depends on AVPlayer or libmpv.
 
@@ -173,7 +173,7 @@ Put the translations in `locales/<language>.json` next to `plugin.json`: `locale
 
 The app translates the plugin's `name`, its settings' `label` and `help`, select option labels and its `navigation` titles with them. Option values are never translated. For what the plugin says itself, such as a page's titles or an error's message, `host.t(text)` answers the translation, or `text` when there's none, and `host.language()` the listener's language, `en` or `zh-CN`. Both follow the listener as they change it, and the page they're on loads again.
 
-With `"playback": "stream"`, Lite plays local file URLs and direct HTTP(S) audio files returned by `stream`. HLS, DASH, and playlists are unsupported. Declare the audio host and redirect CDN hosts in `permissions.network`. With `"playback": "remote"`, the plugin makes the sound itself, or has another program do so, and the app calls the `remote` functions and polls `remoteState`.
+With `"playback": "stream"`, Lite plays local file URLs and direct HTTP(S) audio files returned by `stream`. External HLS, DASH, and playlists are unsupported; the host can internally adapt supported indexed MP4 audio. Declare the audio host and redirect CDN hosts in `permissions.network`. With `"playback": "remote"`, the plugin makes the sound itself, or has another program do so, and the app calls the `remote` functions and polls `remoteState`.
 
 Throw an error with a `code` to say what's wrong: `signIn` prompts the listener to sign in, `setup` sends them to the plugin's settings, `unavailable` means this can't be played, and `unsupported` means the plugin doesn't do this. Any other error shows its message.
 

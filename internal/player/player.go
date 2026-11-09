@@ -1,6 +1,7 @@
 package player
 
 import (
+	"context"
 	"errors"
 	"math/rand/v2"
 	"time"
@@ -57,6 +58,7 @@ type Player struct {
 	out        Transport
 	info       *music.Stream // what the current track streams
 	relay      *audioRelay
+	loadCancel context.CancelFunc
 	engineInfo *music.Stream
 	openEngine func(*music.Stream, bool) (engine, error)
 	engineLoad engineLoad
@@ -502,6 +504,10 @@ func (p *Player) Duration() time.Duration {
 }
 
 func (p *Player) stop() {
+	if p.loadCancel != nil {
+		p.loadCancel()
+		p.loadCancel = nil
+	}
 	if p.relay != nil {
 		p.relay.Close()
 		p.relay = nil
@@ -599,6 +605,8 @@ func (p *Player) loadSkipping(at, skipped, dir int, play bool, from time.Duratio
 	if p.Quality != nil {
 		quality = p.Quality()
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	p.loadCancel = cancel
 	go func() {
 		var info *music.Stream
 		var err error
@@ -610,8 +618,29 @@ func (p *Player) loadSkipping(at, skipped, dir int, play bool, from time.Duratio
 				err = music.ErrUnavailable
 			}
 		}
+
+		var relay *audioRelay
+		if err == nil && ctx.Err() == nil {
+			if _, local := music.PathOf(info.URL); !local {
+				relay, err = newAudioRelay(info)
+				if err == nil {
+					// Closing the load cancels both preparation and an unadopted relay.
+					context.AfterFunc(ctx, relay.Close)
+					err = relay.prepare(ctx)
+				}
+			}
+		}
+		if ctx.Err() != nil || err != nil {
+			if relay != nil {
+				relay.Close()
+				relay = nil
+			}
+		}
 		p.post(func() {
-			if gen != p.gen {
+			if gen != p.gen || ctx.Err() != nil {
+				if relay != nil {
+					relay.Close()
+				}
 				return
 			}
 			if err != nil {
@@ -619,6 +648,7 @@ func (p *Player) loadSkipping(at, skipped, dir int, play bool, from time.Duratio
 				p.loadFailed(t.Source, err, at, skipped, dir)
 				return
 			}
+			p.relay = relay
 			p.startEngine(info, engineLoad{at: at, skipped: skipped, dir: dir})
 		})
 	}()

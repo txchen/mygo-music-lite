@@ -3,6 +3,7 @@ package player
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"mygo-music/internal/music"
@@ -48,7 +49,11 @@ func (p *Player) startEngine(info *music.Stream, load engineLoad) {
 		p.info = info
 		p.engineInfo = info
 		if _, local := music.PathOf(info.URL); !local {
-			relay, err := newAudioRelay(info)
+			relay := p.relay
+			var err error
+			if relay == nil {
+				relay, err = newAudioRelay(info)
+			}
 			if err != nil {
 				p.loading = false
 				p.loadFailed(p.track.Source, err, load.at, load.skipped, load.dir)
@@ -61,6 +66,11 @@ func (p *Player) startEngine(info *music.Stream, load engineLoad) {
 		}
 	}
 	info = p.engineInfo
+	if load.fallback && p.relay != nil && p.relay.hls != nil {
+		direct := *info
+		direct.URL = strings.TrimSuffix(p.relay.url, "/index.m3u8")
+		info = &direct
+	}
 	var out engine
 	var err error
 	if p.openEngine != nil {
