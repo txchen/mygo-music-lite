@@ -292,3 +292,25 @@ func TestNativeFallback(t *testing.T) {
 		}
 	})
 }
+
+// Built-in Lua clients must stay absent because their LuaJIT pages crash the hardened app.
+func TestMPVDoesNotLoadBuiltinScripts(t *testing.T) {
+	if loadMPV() != nil {
+		t.Skip("optional Homebrew libmpv not installed")
+	}
+	path, err := filepath.Abs(filepath.Join("testdata", "seek.ogg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := openMPV(&music.Stream{URL: music.FileURL(path)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer out.Close()
+	p := out.(*mpvPlayer)
+	for _, name := range []string{"osc", "ytdl_hook", "stats", "console", "auto_profiles", "select", "positioning", "commands", "context_menu"} {
+		if err := p.cmd("script-message-to", name, "mygo-test-probe"); err == nil {
+			t.Errorf("built-in script client %q is running", name)
+		}
+	}
+}
