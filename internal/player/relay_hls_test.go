@@ -3,11 +3,14 @@ package player
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -217,5 +220,125 @@ func TestInternalHLSCancelPreparation(t *testing.T) {
 	}
 	if relay.Err() != nil || relay.hls != nil {
 		t.Fatal("cancelled preparation published or poisoned relay")
+	}
+}
+
+// Redirected metadata and segments authorize each hop without restoring source credentials.
+func TestInternalHLSRedirectAuthorization(t *testing.T) {
+	_, _, all := indexedFixture(0, 0)
+	var leaked atomic.Bool
+	destination := indexedServer(t, all, func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Header.Get("Authorization") != "" || r.Header.Get("X-Source-Secret") != "" {
+			leaked.Store(true)
+		}
+		return false
+	})
+	defer destination.Close()
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "secret" {
+			t.Error("original headers lost")
+		}
+		http.Redirect(w, r, destination.URL, http.StatusFound)
+	}))
+	defer origin.Close()
+	var authorized atomic.Int32
+	relay := testRelay(t, &music.Stream{URL: origin.URL, Headers: map[string]string{"Authorization": "secret", "X-Source-Secret": "private"}, AuthorizeURL: func(u *url.URL) error {
+		if u.Host == strings.TrimPrefix(destination.URL, "http://") {
+			authorized.Add(1)
+		}
+		return nil
+	}})
+	if e := relay.prepare(context.Background()); e != nil {
+		t.Fatal(e)
+	}
+	before := authorized.Load()
+	getRelay(t, "GET", strings.TrimSuffix(relay.url, "index.m3u8")+"seg/1.m4s", "")
+	if leaked.Load() || authorized.Load() != before+1 || before < 3 {
+		t.Fatalf("headers leaked=%v, redirects authorized=%d", leaked.Load(), authorized.Load())
+	}
+}
+
+// Closing an asset cancels active segment reads and requests waiting for a buffer slot.
+func TestInternalHLSCloseConcurrentSegments(t *testing.T) {
+	_, _, all := indexedFixture(0, 0)
+	var blocking atomic.Bool
+	started := make(chan struct{}, 8)
+	server := indexedServer(t, all, func(w http.ResponseWriter, r *http.Request) bool {
+		if !blocking.Load() {
+			return false
+		}
+		started <- struct{}{}
+		<-r.Context().Done()
+		return true
+	})
+	defer server.Close()
+	relay := preparedRelay(t, server.URL)
+	blocking.Store(true)
+	root := strings.TrimSuffix(relay.url, "index.m3u8")
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			res, e := http.Get(root + "seg/0.m4s")
+			if e == nil {
+				res.Body.Close()
+			}
+		}()
+	}
+	for range 2 {
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			t.Fatal("segment reads did not start")
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	req, _ := http.NewRequestWithContext(ctx, "GET", root+"seg/1.m4s", nil)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		res, e := http.DefaultClient.Do(req)
+		if e == nil {
+			res.Body.Close()
+		}
+	}()
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("queued segment ignored cancellation")
+	}
+	relay.Close()
+	wg.Wait()
+	if relay.Err() != nil {
+		t.Fatal("cancelled segments poisoned relay")
+	}
+	if len(started) != 0 {
+		t.Fatal("more than two upstream buffers were active")
+	}
+}
+
+// Rejected permission redirects cannot publish an internally generated asset.
+func TestInternalHLSDeniedDiscoveryRedirect(t *testing.T) {
+	_, _, all := indexedFixture(0, 0)
+	destination := indexedServer(t, all, nil)
+	defer destination.Close()
+	origin := indexedServer(t, all, func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Header.Get("Range") != "bytes=0-511" {
+			http.Redirect(w, r, destination.URL, http.StatusFound)
+			return true
+		}
+		return false
+	})
+	defer origin.Close()
+	relay := testRelay(t, &music.Stream{URL: origin.URL, AuthorizeURL: func(u *url.URL) error {
+		if u.Host == strings.TrimPrefix(destination.URL, "http://") {
+			return errors.New("denied")
+		}
+		return nil
+	}})
+	if e := relay.prepare(context.Background()); e == nil || relay.hls != nil {
+		t.Fatal("denied discovery published an asset")
 	}
 }

@@ -1,6 +1,9 @@
 package player
 
 import (
+	"errors"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -109,5 +112,87 @@ func TestNetworkStreamUsesRelay(t *testing.T) {
 	p.Close()
 	if relay.ctx.Err() == nil || p.relay != nil {
 		t.Fatal("Close left relay active")
+	}
+}
+
+// Closing while metadata is loading cancels the old request and never opens its native engine.
+func TestCloseDuringHLSPreparation(t *testing.T) {
+	_, _, all := indexedFixture(0, 0)
+	started, cancelled := make(chan struct{}), make(chan struct{})
+	server := indexedServer(t, all, func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Header.Get("Range") == "bytes=0-511" {
+			return false
+		}
+		close(started)
+		<-r.Context().Done()
+		close(cancelled)
+		return true
+	})
+	defer server.Close()
+	posted := make(chan func(), 8)
+	p := New(func(fn func()) { posted <- fn })
+	defer p.Close()
+	asked := 0
+	src := streamer{st: music.Stream{URL: server.URL}, asked: &asked}
+	p.Source = func(string) music.Source { return src }
+	opened := 0
+	p.openEngine = func(*music.Stream, bool) (engine, error) { opened++; return &fakeEngine{state: outputReady}, nil }
+	p.PlayQueue([]music.Track{{ID: "a"}}, 0)
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("metadata preparation did not start")
+	}
+	p.Close()
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("Close left metadata request active")
+	}
+	for range 2 {
+		select {
+		case fn := <-posted:
+			fn()
+		case <-time.After(time.Second):
+			t.Fatal("stale worker result did not arrive")
+		}
+	}
+	if opened != 0 || p.relay != nil || p.Ready() {
+		t.Fatal("cancelled preparation reopened native playback")
+	}
+}
+
+// Native fallback reads the original direct file route without enabling manifest references in mpv.
+func TestInternalHLSNativeFallbackUsesDirectRoute(t *testing.T) {
+	_, _, all := indexedFixture(0, 0)
+	server := indexedServer(t, all, nil)
+	defer server.Close()
+	relay := preparedRelay(t, server.URL)
+	p := New(func(fn func()) { fn() })
+	defer p.Close()
+	p.Cue([]music.Track{{ID: "a"}})
+	p.loading = true
+	p.relay = relay
+	calls := 0
+	p.openEngine = func(st *music.Stream, fallback bool) (engine, error) {
+		calls++
+		if !fallback {
+			if st.URL != relay.url {
+				t.Fatal("primary did not receive internal HLS")
+			}
+			return nil, errors.New("primary unavailable")
+		}
+		if st.URL != strings.TrimSuffix(relay.url, "/index.m3u8") || st.Headers != nil || st.AuthorizeURL != nil {
+			t.Fatal("fallback lost direct secure route")
+		}
+		res, b := getRelay(t, "GET", st.URL, "bytes=0-31")
+		if res.StatusCode != 206 || len(b) != 32 {
+			t.Fatal("fallback direct route unavailable")
+		}
+		return &fakeEngine{state: outputReady}, nil
+	}
+	p.startEngine(&music.Stream{URL: server.URL}, engineLoad{dir: stay})
+	if calls != 2 || !p.Ready() || p.relay != relay {
+		t.Fatal("fallback did not retain prepared relay")
 	}
 }
