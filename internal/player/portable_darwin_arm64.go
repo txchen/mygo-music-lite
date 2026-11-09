@@ -87,3 +87,5 @@ func (p *portablePlayer) underruns() uint64 { return uint64(C.mm_audio_underruns
 func (p *portablePlayer) energy() float64   { return float64(C.mm_audio_energy(p.handle)) }
 
 func (p *portablePlayer) outputEnergy() float64 { return float64(C.mm_audio_output_energy(p.handle)) }
+
+func (p *portablePlayer) deviceRunning() bool { return C.mm_audio_device_running(p.handle) != 0 }

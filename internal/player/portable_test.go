@@ -143,6 +143,15 @@ func TestPortableCloseBlockedRead(t *testing.T) {
 	out.SetVolume(0)
 	out.Play()
 	nativeWait(t, func() bool { return out.Position() > 2500*time.Millisecond })
+	out.Pause()
+	if out.(*portablePlayer).deviceRunning() {
+		t.Fatal("paused stalled read left the output device running")
+	}
+	paused := out.Position()
+	time.Sleep(40 * time.Millisecond)
+	if out.Position() != paused {
+		t.Fatal("paused stalled read advanced")
+	}
 	begin := time.Now()
 	out.Close()
 	elapsed := time.Since(begin)

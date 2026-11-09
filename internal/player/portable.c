@@ -22,7 +22,7 @@
 
 struct mm_audio {
   pthread_t thread;
-  pthread_mutex_t mutex;
+  pthread_mutex_t mutex, device_mutex;
   pthread_cond_t wake;
   char *url;
   int network, primary_opened;
@@ -41,7 +41,8 @@ struct mm_audio {
   int stream, packet_pending, draining, decoder_done;
   ma_pcm_rb ring;
   ma_device device;
-  int ring_ready, device_ready, device_started;
+  int ring_ready, device_ready;
+  atomic_int device_started;
   float *samples;
   unsigned sample_capacity;
 };
@@ -138,12 +139,27 @@ static void wait_work(mm_audio *a) {
   pthread_mutex_unlock(&a->mutex);
 }
 static void stop_device(mm_audio *a) {
-  if (a->device_started) {
+  pthread_mutex_lock(&a->device_mutex);
+  if (atomic_load(&a->device_started)) {
     atomic_store(&a->intentional_stop, 1);
     ma_device_stop(&a->device);
-    a->device_started = 0;
+    atomic_store(&a->device_started, 0);
     atomic_store(&a->intentional_stop, 0);
   }
+  pthread_mutex_unlock(&a->device_mutex);
+}
+static int start_device(mm_audio *a) {
+  int result = 0;
+  pthread_mutex_lock(&a->device_mutex);
+  if (atomic_load(&a->playing) && !atomic_load(&a->stop) &&
+      !atomic_load(&a->device_started)) {
+    if (ma_device_start(&a->device) != MA_SUCCESS)
+      result = -1;
+    else
+      atomic_store(&a->device_started, 1);
+  }
+  pthread_mutex_unlock(&a->device_mutex);
+  return result;
 }
 static int open_input(mm_audio *a) {
   a->format = avformat_alloc_context();
@@ -210,9 +226,12 @@ static int open_input(mm_audio *a) {
   cfg.dataCallback = callback;
   cfg.notificationCallback = notification;
   cfg.pUserData = a;
-  if (ma_device_init(NULL, &cfg, &a->device) != MA_SUCCESS)
+  pthread_mutex_lock(&a->device_mutex);
+  int initialized = ma_device_init(NULL, &cfg, &a->device) == MA_SUCCESS;
+  a->device_ready = initialized;
+  pthread_mutex_unlock(&a->device_mutex);
+  if (!initialized)
     return -1;
-  a->device_ready = 1;
   return 0;
 }
 static int apply_seek(mm_audio *a) {
@@ -268,9 +287,8 @@ static int put_samples(mm_audio *a, float *samples, int frames) {
       if (!atomic_load(&a->playing))
         stop_device(a);
       else if (!a->device_started) {
-        if (ma_device_start(&a->device) != MA_SUCCESS)
+        if (start_device(a) < 0)
           return -1;
-        a->device_started = 1;
       }
       wait_work(a);
     }
@@ -389,11 +407,10 @@ static void *worker(void *opaque) {
       stop_device(a);
     else if (!a->device_started &&
              (ma_pcm_rb_available_read(&a->ring) >= 4800 || a->decoder_done)) {
-      if (ma_device_start(&a->device) != MA_SUCCESS) {
+      if (start_device(a) < 0) {
         atomic_store(&a->state, -1);
         break;
       }
-      a->device_started = 1;
     }
     if (a->decoder_done) {
       if (ma_pcm_rb_available_read(&a->ring) == 0) {
@@ -424,11 +441,13 @@ mm_audio *mm_audio_open(const char *url, int network) {
   a->network = network;
   atomic_init(&a->volume, 1);
   pthread_mutex_init(&a->mutex, NULL);
+  pthread_mutex_init(&a->device_mutex, NULL);
   pthread_cond_init(&a->wake, NULL);
   if (!a->url || pthread_create(&a->thread, NULL, worker, a) != 0) {
     free(a->url);
     pthread_cond_destroy(&a->wake);
     pthread_mutex_destroy(&a->mutex);
+    pthread_mutex_destroy(&a->device_mutex);
     free(a);
     return NULL;
   }
@@ -455,6 +474,7 @@ void mm_audio_close(mm_audio *a) {
   avformat_close_input(&a->format);
   pthread_cond_destroy(&a->wake);
   pthread_mutex_destroy(&a->mutex);
+  pthread_mutex_destroy(&a->device_mutex);
   free(a->url);
   free(a);
 }
@@ -462,6 +482,8 @@ void mm_audio_play(mm_audio *a, int playing) {
   if (!a)
     return;
   atomic_store(&a->playing, playing);
+  if (!playing)
+    stop_device(a);
   pthread_mutex_lock(&a->mutex);
   pthread_cond_signal(&a->wake);
   pthread_mutex_unlock(&a->mutex);
@@ -504,4 +526,8 @@ double mm_audio_energy(mm_audio *a) { return a ? atomic_load(&a->energy) : 0; }
 
 double mm_audio_output_energy(mm_audio *a) {
   return a ? atomic_load(&a->output_energy) : 0;
+}
+
+int mm_audio_device_running(mm_audio *a) {
+  return a ? atomic_load(&a->device_started) : 0;
 }
