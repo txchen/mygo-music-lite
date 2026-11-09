@@ -55,3 +55,16 @@ Each median uses five consecutive ten-second intervals in one process, not five 
 Raw samples are in [playback-samples.json](playback-samples.json). The full local artifacts, including the profile and CoreAudio assertions, are under `/Users/hibiki/.pi/agent/pstack-runs/mygo-lite-native-20261108/`.
 
 Visible-window CPU remains unverified because the session was locked. The UI interaction and frame-budget tests passed; a tester-rendered Now Playing screenshot was inspected separately. macOS 13 and later are the declared deployment target, but only this machine's macOS version was exercised. Independent review was unavailable.
+
+## Network playback
+
+Run the native HTTP transport checks with:
+
+```sh
+go test ./internal/player -run 'TestNativeNetworkTransport|TestAudioRelay|TestNetworkStream' -count=5
+go test ./internal/plugin -run TestStreamNetworkAuthorization -count=5
+```
+
+The native test serves checked-in MP3 and WavPack fixtures over a local HTTP server with an authorization header. It drives Player through the byte relay, checks playback progress, pauses, seeks while paused, and resumes. WavPack verifies AVPlayer to optional libmpv fallback. Tests isolate app data through the player package's TestMain. These checks do not establish compatibility with every service or measure network CPU use.
+
+For hardened-runtime verification, compile the player tests with `go test -c -o /tmp/mygo-lite-network.test ./internal/player`, sign that executable with the release identity and release entitlements, and run `(cd internal/player && /tmp/mygo-lite-network.test -test.run TestNativeNetworkTransport -test.count=5 -test.v)` so the fixture paths resolve. Repeat direct network playback in the signed app before publishing. HLS, DASH, and playlist playback are unsupported.

@@ -2,6 +2,18 @@
 
 Lite changes are listed first, followed by the upstream MyGo Music history. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.3.0 - 2026-11-08
+
+### Added
+
+- Native playback of direct HTTP(S) audio through a per-track byte relay, with seeking, plugin request headers, redirect permission checks, and AVPlayer to libmpv fallback.
+- Network transport tests using real MP3 and WavPack files, including pause and seek after fallback. HLS, DASH, and playlist streams remain unsupported.
+
+### Changed
+
+- Network audio credentials stay on the exact original origin. Redirects cannot restore stripped headers or downgrade HTTPS to HTTP. Track closure cancels active transfers.
+- Lite's upstream plugin compatibility baseline remains `0.1.22` independently of the app's `0.3.0` feature release.
+
 ## 0.2.0 - 2026-11-08
 
 ### Changed

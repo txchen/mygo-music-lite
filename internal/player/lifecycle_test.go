@@ -89,15 +89,25 @@ func TestCloseDuringLoad(t *testing.T) {
 	}
 }
 
-// Network stream credentials must not reach a native engine before redirect handling is implemented.
-func TestLocalPreviewRejectsNetworkStream(t *testing.T) {
+// Network playback gives native engines only a loopback URL and releases it on Close.
+func TestNetworkStreamUsesRelay(t *testing.T) {
 	p := New(func(fn func()) { fn() })
 	p.Cue([]music.Track{{ID: "a"}})
 	p.loading, p.playing = true, true
-	opened := false
-	p.openEngine = func(*music.Stream, bool) (engine, error) { opened = true; return &fakeEngine{}, nil }
-	p.startEngine(&music.Stream{URL: "https://example.com/audio", Headers: map[string]string{"Authorization": "Bearer secret"}}, engineLoad{dir: stay})
-	if opened || p.Loading() || p.Playing() || p.Err() == "" {
-		t.Fatal("network stream was not rejected at the engine boundary")
+	st := &music.Stream{URL: "https://example.com/audio", Headers: map[string]string{"Authorization": "Bearer secret"}}
+	p.openEngine = func(got *music.Stream, _ bool) (engine, error) {
+		if got.URL == st.URL || got.Headers != nil || got.AuthorizeURL != nil {
+			t.Fatal("native engine received upstream stream")
+		}
+		return &fakeEngine{state: outputReady}, nil
+	}
+	p.startEngine(st, engineLoad{dir: stay})
+	if p.Stream() != st || p.relay == nil {
+		t.Fatal("original stream or relay lost")
+	}
+	relay := p.relay
+	p.Close()
+	if relay.ctx.Err() == nil || p.relay != nil {
+		t.Fatal("Close left relay active")
 	}
 }
