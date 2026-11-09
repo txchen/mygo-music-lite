@@ -16,7 +16,7 @@ cask "mygo-music-lite" do
   sha256 "$sha"
 
   url "https://api.github.com/repos/txchen/mygo-music-lite/releases/assets/$asset_id",
-      header: { "Accept" => "application/octet-stream" }
+      header: "Accept: application/octet-stream"
   container type: :zip
   name "MyGo Music Lite"
   desc "Local music player with AVPlayer and optional mpv playback"
