@@ -113,7 +113,7 @@ var zhCN = map[string]string{
 	"Can reach any website": "可访问任何网站",
 	"This plugin wants to start programs, which can do anything you can. Only allow it if you trust it.": "这个插件想启动程序，这些程序能做你能做的任何事。只有信任它时才允许。",
 	"This plugin wants to start %s, which can do anything you can. Only allow it if you trust it.":       "这个插件想启动 %s，这些程序能做你能做的任何事。只有信任它时才允许。",
-	"%s needs MyGo Music %s or later. Update MyGo Music first.":                                          "%s 需要 MyGo Music %s 或更高版本，请先更新 MyGo Music。",
+	"%s requires plugin compatibility %s; MyGo Music Lite supports %s":                                   "%s 需要插件兼容版本 %s；MyGo Music Lite 支持 %s。",
 	"Couldn't check for updates": "无法检查更新",
 	"Checking for updates…":      "正在检查更新…",
 	"Up to date":                 "已是最新",

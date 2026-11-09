@@ -126,29 +126,25 @@ func (ps Programs) Allows(dir, command string) bool {
 type Manifest struct {
 	music.Info
 	Main string `json:"main,omitempty"`
-	// MinAppVersion is the oldest version of the app the plugin works with,
-	// such as 0.1.8. An older one won't install it, or load it.
+	// MinAppVersion is the upstream plugin compatibility requirement, such as
+	// 0.1.8. The JSON field name is retained for existing plugins.
 	MinAppVersion  string           `json:"minAppVersion,omitempty"`
 	Permissions    Permissions      `json:"permissions"`
 	RequestHeaders []RequestHeaders `json:"requestHeaders,omitempty"`
 }
 
-// appVersion is the app's version, which the app sets. With none, as when
-// it's built for development, any plugin loads.
-var appVersion string
+// CompatibilityVersion is the upstream plugin baseline supported by Lite.
+// It is independent of the app release version and applies to development too.
+const CompatibilityVersion = "0.1.22"
 
-// SetAppVersion says which version of the app this is.
-func SetAppVersion(v string) { appVersion = v }
-
-// NeedsNewerApp is why a plugin doesn't load: it works with a newer version of
-// the app than this.
+// NeedsNewerApp means a plugin requires a newer upstream compatibility baseline.
 type NeedsNewerApp struct {
 	Plugin  string // its name
-	Version string // the oldest version it works with
+	Version string // its required upstream compatibility version
 }
 
 func (e *NeedsNewerApp) Error() string {
-	return fmt.Sprintf("%s needs MyGo Music %s or later", e.Plugin, e.Version)
+	return fmt.Sprintf("%s requires plugin compatibility %s; MyGo Music Lite supports %s", e.Plugin, e.Version, CompatibilityVersion)
 }
 
 // Plugin is a music.Source in JavaScript. It starts on first use, and again on
@@ -213,7 +209,7 @@ func Load(dir, dataDir string) (*Plugin, error) {
 		if _, ok := versionNumbers(m.MinAppVersion); !ok {
 			return nil, fmt.Errorf("%s: minAppVersion isn't a version such as 0.1.8: %q", dir, m.MinAppVersion)
 		}
-		if _, ok := versionNumbers(appVersion); ok && IsNewer(m.MinAppVersion, appVersion) {
+		if IsNewer(m.MinAppVersion, CompatibilityVersion) {
 			return nil, &NeedsNewerApp{Plugin: m.Name, Version: m.MinAppVersion}
 		}
 	}

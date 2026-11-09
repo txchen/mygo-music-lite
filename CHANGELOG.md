@@ -1,6 +1,13 @@
 # Changelog
 
-All notable changes to MyGo Music are written down here. Versions follow [Semantic Versioning](https://semver.org).
+Lite changes are listed first, followed by the upstream MyGo Music history. Versions follow [Semantic Versioning](https://semver.org).
+
+## 0.2.0 - 2026-11-08
+
+### Changed
+
+- Lite releases use their own app version. Plugin `minAppVersion` requirements still use the fixed upstream compatibility baseline `0.1.22`, including in development builds.
+- Documented the native local playback engines, removed upstream features, separate app identity, and plugin limits in [differences from upstream](docs/fork-changes.md).
 
 ## [0.1.22] - 2026-11-07
 
