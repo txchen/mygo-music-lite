@@ -2,6 +2,13 @@
 
 Lite changes are listed first, followed by the upstream MyGo Music history. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.3.1 - 2026-11-09
+
+### Fixed
+
+- Long indexed AAC streams start through AVPlayer without scanning the complete fragmented MP4. Lite generates an internal HLS playlist from the source index and fetches bounded segments without transcoding.
+- Track changes and closure cancel index preparation and segment requests. Unsupported layouts retain direct playback, including the existing libmpv fallback.
+
 ## 0.3.0 - 2026-11-08
 
 ### Added
