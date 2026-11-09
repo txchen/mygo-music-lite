@@ -1,51 +1,43 @@
-# MyGo Music Lite
+> **MyGo Music Lite fork:** See the [Lite guide](docs/fork-changes.md) for installation, upgrades, fork changes, build instructions, and plugin compatibility. The upstream README below is preserved for reference; its features and build instructions describe the original MyGo Music.
 
-A macOS Apple Silicon fork of [mygo-music](https://github.com/egoist/mygo-music), focused on low CPU use during local playback.
+---
 
-## Install
+# MyGo Music
 
-Requires macOS 13 or later on Apple Silicon.
+A native desktop music player written in Go with [MyGo](https://github.com/egoist/mygo), no WebView. It plays your local files out of the box, and everything else comes from plugins.
 
-```sh
-brew install --cask txchen/tap/mygo-music-lite
-```
+## Features
 
-Release bundles are Developer ID signed and notarized. See [release instructions](RELEASING.md) to build and publish one.
-
-## Playback
-
-FFmpeg decodes local files and direct HTTP(S) audio; miniaudio sends the decoded audio to the output device. Both libraries are bundled, so common formats need no separate playback dependency. Homebrew's libmpv remains an optional fallback for a failed track (`brew install mpv`).
-
-The library retains folders, tags, covers, playlists, search, ordinary line-synced lyrics, queue controls, session restore, and media keys. Local scanning includes MP3, FLAC, Ogg, Opus, WAV, M4A, AAC, AIFF, WMA, APE, WavPack, and WebM. The bundled backend includes decoders for these formats; unsupported variants can use the optional fallback.
-
-There is no spectrum, lyric stage, word animation, speech transcription, persistent audio cache, normalization, fade, or gapless playback. Image caching and manually saving a file remain.
-
-Direct HTTP(S) audio plays through a per-track loopback relay. It forwards byte ranges for seeking, applies plugin headers only to the original origin, and checks plugin network permissions on redirects. FFmpeg reads fragmented MP4 directly, without an intermediate HLS conversion. External HLS, DASH, and playlist URLs remain unsupported. Network sources need permission for the audio host and every redirect host, including CDNs.
-
-The relay reads a small format probe and streams bytes on engine demand. It does not decode, transcode, or save a complete track. Paused engines can retain or finish filling their own buffers. Playback stops when a network read stalls for 30 seconds. The output uses a bounded PCM buffer.
-
-The app uses its own identifier, URL scheme, and data directory. It does not import upstream settings or install upstream app updates. Lite releases have their own version. See [differences from upstream](docs/fork-changes.md) for the playback changes and plugin compatibility limits.
+- Local files (MP3, FLAC, Ogg Vorbis, WAV, and ALAC, FLAC or AAC in .m4a and .aac) with tags, covers and `.lrc` lyrics
+- Playlists, liked songs, search, albums and artists
+- Now Playing with lyric stage styles, cover wall, queue, shuffle and repeat
+- Notch player on macOS, tray, media keys
+- Audio cache, fades on pause and seek, loudness normalization
+- Session restore
+- Podcast captions, written down on the device as episodes play
+- English and Simplified Chinese
+- Plugins can add accounts, catalogs, podcasts, stations, comments and pages of their own
 
 ## Build
 
-Requires macOS 13 or later on Apple Silicon, Xcode Command Line Tools, Go as specified in `go.mod`, and Bun. The audio bridge needs cgo; the first dependency build also needs curl and make.
-
-```sh
-scripts/build-audio.sh
-CGO_ENABLED=1 go tool mygo dev
-CGO_ENABLED=1 go tool mygo build -platform darwin/arm64 -skip-dmg
+```bash
+go tool mygo dev     # run in development
+go tool mygo build   # package into build/
 go test ./internal/...
 ```
 
-Open `build/darwin-arm64/MyGo Music Lite.app`. It is ad-hoc signed, not notarized.
+## Podcast captions
 
-See [bundled library licenses and rebuilding](THIRD_PARTY.md). The playback libraries are portable, but this release of the application still supports macOS Apple Silicon only.
+Episodes are written down on the device as they play, with [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) and Qwen3-ASR, which the app downloads when the listener asks for them. The libraries come from this repository's `sherpa-onnx-<version>` prerelease, which only changes with that version:
 
-See [playback verification](docs/playback-verification.md) for native tests and the CPU measurement command.
+```bash
+go run ./scripts/sherpa -sign "Developer ID Application: …"
+gh release create sherpa-onnx-2.0.1 --prerelease --latest=false build/sherpa/*
+```
 
 ## Plugins
 
-A plugin is a folder in the app's `plugins` directory (Settings > Plugins > + > Show Plugins Folder) with a `plugin.json` and one JavaScript or TypeScript file. Install one with the + in Settings > Plugins from GitHub, by its repository or its address, or from its folder or a zip of it on this computer, or drop the folder in by hand. Remove one from its ⋯ menu there. The plugin API is retained from upstream. This fork targets macOS Apple Silicon only. [`examples/demo-plugin`](examples/demo-plugin) does everything a plugin can with made-up data: copy it to start.
+A plugin is a folder in the app's `plugins` directory (Settings > Plugins > + > Show Plugins Folder) with a `plugin.json` and one JavaScript or TypeScript file. Install one with the + in Settings > Plugins from GitHub, by its repository or its address, or from its folder or a zip of it on this computer, or drop the folder in by hand. Remove one from its ⋯ menu there. There's nothing to build, and the same plugin runs on every platform. [`examples/demo-plugin`](examples/demo-plugin) does everything a plugin can with made-up data: copy it to start.
 
 ```json
 {
@@ -112,7 +104,7 @@ Export a function for each thing the plugin does. Each takes one object of param
 | `likeComment` | `{trackId, commentId, on}` | |
 | `postComment` | `{trackId, text}` | `Comment` |
 | `lyrics` | `{id}` | `{lrc, translation}`, or `{lines}` with timed `words` |
-| `stream` | `{id, quality}` | `{url, type, headers, size, gain, peak}`, where `type` identifies the container. Lite ignores `gain` and `peak`; native engines decide which codecs they can play |
+| `stream` | `{id, quality}` | `{url, type, headers, size, gain, peak}`, where `type` is `mp3`, `flac`, `ogg`, `wav`, `m4a` (ALAC, FLAC or AAC-LC, whole or in fragments as a DASH stream serves it) or `aac` (AAC-LC in ADTS) |
 | `remotePlay` | `{ids, start, position}` | |
 | `remotePause`, `remoteResume` | | |
 | `remoteSeek` | `{position}` | |
@@ -129,7 +121,7 @@ Of the `playlists`, those with `mine` are the listener's own, listed under My Pl
 
 `navigation` is the plugin's sidebar, in its order. An entry opens a `browse` page of its own by `page`, or one of the app's by `builtin`: `home`, `liked`, `savedAlbums`, `stations` or `shows`, which can be given a `title`. Without `navigation`, the sidebar has an entry for each of the app's pages the plugin can do. Up to four stations show as a switch over one card, and more as a grid.
 
-`minAppVersion` retains its upstream JSON name. Lite checks it against a fixed upstream plugin compatibility baseline of `0.1.22`, independently of its app release version, including in development. Requirements above `0.1.22` and malformed versions are rejected. Passing this check does not guarantee every plugin feature works in Lite. See [plugin compatibility](docs/fork-changes.md#plugin-compatibility).
+`minAppVersion` is the oldest version of MyGo Music the plugin works with. An older one won't install it, and says to update first. Versions before 0.1.8 don't read it.
 
 ### Setting controls
 
@@ -170,7 +162,7 @@ Put the translations in `locales/<language>.json` next to `plugin.json`: `locale
 
 The app translates the plugin's `name`, its settings' `label` and `help`, select option labels and its `navigation` titles with them. Option values are never translated. For what the plugin says itself, such as a page's titles or an error's message, `host.t(text)` answers the translation, or `text` when there's none, and `host.language()` the listener's language, `en` or `zh-CN`. Both follow the listener as they change it, and the page they're on loads again.
 
-With `"playback": "stream"`, Lite plays local file URLs and direct HTTP(S) audio files returned by `stream`. External HLS, DASH, and playlists are unsupported; the host can internally adapt supported indexed MP4 audio. Declare the audio host and redirect CDN hosts in `permissions.network`. With `"playback": "remote"`, the plugin makes the sound itself, or has another program do so, and the app calls the `remote` functions and polls `remoteState`.
+With `"playback": "stream"`, the app plays what `stream` answers. With `"playback": "remote"`, the plugin makes the sound itself, or has another program do so, and the app calls the `remote` functions and polls `remoteState`.
 
 Throw an error with a `code` to say what's wrong: `signIn` prompts the listener to sign in, `setup` sends them to the plugin's settings, `unavailable` means this can't be played, and `unsupported` means the plugin doesn't do this. Any other error shows its message.
 
@@ -180,7 +172,7 @@ Put it in a public GitHub repository, with `plugin.json` at the top. The app tak
 
 Add the topic `mygo-music-plugin` to the repository to have it listed on the [plugins page](https://mygo-music.egoist.dev/plugins).
 
-Link to `mygo-music-lite://install-plugin?repo=owner/repo` for an install button: it opens the app, which downloads the plugin and asks the listener before installing it. The development app (`mygo dev`) answers `mygo-music-lite-dev://` instead.
+Link to `mygo-music://install-plugin?repo=owner/repo` for an install button: it opens the app, which downloads the plugin and asks the listener before installing it. The development app (`mygo dev`) answers `mygo-music-dev://` instead.
 
 ### What a plugin can reach
 
@@ -214,13 +206,12 @@ Everything else takes a permission in `plugin.json`:
   ]
   ```
 
-  `hosts` are hosts or `*.domain`, which the network permission has to reach, or `{setting:key}`, the host of the server a setting names, such as `https://nas.local:5666`, while the network permission reaches it. `*` isn't one. Without `kinds`, they go with both. In `headers`, `{setting:key}` is what the listener filled in and `{storage:key}` what the plugin keeps with `host.storage`, as each is when the request goes out: a token the plugin stores anew goes with the next one, and none is kept in a URL. A header whose value isn't there yet, as before signing in, is left out. The headers a `stream` answers come first. Image and manual-download requests do not forward these headers to another host on redirect. For native network audio, headers stay on the exact original origin, including scheme and port. After any origin change, they remain stripped even if a redirect returns to that origin. HTTPS redirects to HTTP are rejected. Audio URL credentials must be in headers or signed query parameters, rather than URL user information.
+  `hosts` are hosts or `*.domain`, which the network permission has to reach, or `{setting:key}`, the host of the server a setting names, such as `https://nas.local:5666`, while the network permission reaches it. `*` isn't one. Without `kinds`, they go with both. In `headers`, `{setting:key}` is what the listener filled in and `{storage:key}` what the plugin keeps with `host.storage`, as each is when the request goes out: a token the plugin stores anew goes with the next one, and none is kept in a URL. A header whose value isn't there yet, as before signing in, is left out. The headers a `stream` answers come first. Neither goes on to another host a request is redirected to.
 - `"process": ["bin/helper-*", "ffmpeg"]` lists the programs `host.spawn` can start, for what JavaScript can't do: a path from the plugin's folder or absolute, or a name looked up on `PATH`. A path only matches a path and a name only a name, and `*` matches within one folder, as in a glob. `["*"]`, or `true`, asks for any program, which the listener is warned about. The listener has to allow it in Settings first, as a program can do anything they can. Programs end when the plugin does, and once allowed, `fetch` can reach this machine too, to talk to them. Ship one binary per platform and pick it with `host.platform` and `host.arch`.
 
 ## Credits
 
-- [mygo-music](https://github.com/egoist/mygo-music) provides the original application and plugin API.
-- [folia-major](https://github.com/chthollyphile/folia-major) inspired the upstream lyric stage, which this fork removes.
+- [folia-major](https://github.com/chthollyphile/folia-major): the lyric stage animations
 
 ## License
 

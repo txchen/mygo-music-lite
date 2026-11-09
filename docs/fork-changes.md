@@ -1,10 +1,42 @@
-# Differences from upstream
+# MyGo Music Lite: installation and fork changes
 
 MyGo Music Lite is a fork of [mygo-music](https://github.com/egoist/mygo-music). It targets native local and direct network playback on macOS 13 or later, on Apple Silicon. The app release version is `0.4.0`. The upstream plugin compatibility baseline is separately fixed at `0.1.22`.
+
+## Install and upgrade
+
+Requires macOS 13 or later on Apple Silicon. FFmpeg and miniaudio are bundled; they do not need to be installed separately.
+
+```sh
+brew install --cask txchen/tap/mygo-music-lite
+```
+
+To upgrade, quit the running app, then run:
+
+```sh
+brew update
+brew upgrade --cask txchen/tap/mygo-music-lite
+```
+
+You can also download the app from [Lite releases](https://github.com/txchen/mygo-music-lite/releases/latest). Release bundles are signed and notarized.
+
+## Build
+
+Requires Xcode Command Line Tools, Go as specified in `go.mod`, Bun, curl, and make on macOS Apple Silicon. The audio bridge requires cgo.
+
+```sh
+scripts/build-audio.sh
+CGO_ENABLED=1 go tool mygo dev
+CGO_ENABLED=1 go tool mygo build -platform darwin/arm64 -skip-dmg
+go test ./internal/...
+```
+
+Open `build/darwin-arm64/MyGo Music Lite.app`. Development builds are ad-hoc signed, not notarized. See [release instructions](../RELEASING.md) for publishing and [bundled library licenses and rebuilding](../THIRD_PARTY.md) for dependency sources.
 
 ## Playback
 
 Lite uses bundled FFmpeg decoding and miniaudio output instead of the upstream Go audio path. The backend performs decoding, resampling and volume adjustment with a bounded PCM ring. Homebrew's libmpv is retained as an optional fallback for failed tracks; it is loaded on demand and not bundled.
+
+Local scanning includes MP3, FLAC, Ogg, Opus, WAV, M4A, AAC, AIFF, WMA, APE, WavPack, and WebM. The bundled backend includes decoders for these formats; unsupported variants can use the optional fallback. Install that fallback with `brew install mpv` if needed.
 
 Direct network audio passes through an opaque per-track loopback relay. Native engines never receive the original URL or its headers. The relay streams bounded byte buffers and forwards Range and If-Range requests. It performs no decoding, transcoding, or complete-file disk buffering. A small offset-zero probe checks known audio container signatures before native requests proceed. The actual full response is checked too, so a successful probe cannot disguise a later playlist response.
 
@@ -33,3 +65,7 @@ The manifest field `minAppVersion` keeps its upstream JSON name for existing plu
 A missing requirement or a valid requirement at or below `0.1.22` passes the version check. A requirement above that baseline, such as `0.1.23` or `0.2.0`, is rejected. A malformed requirement is rejected too. Raising Lite's app release version does not raise the baseline.
 
 Passing the version check does not guarantee that every plugin feature works. Plugins still need to respect Lite's direct audio requirement and removed features. A network `stream` needs audio and redirect host permissions, and cannot be an HLS or DASH manifest. Timed lyric words do not restore the removed word animation. The baseline records the inherited API requirement, not complete upstream feature parity.
+
+For `playback: "stream"`, Lite accepts local file URLs and direct HTTP(S) audio returned by `stream`. It ignores the `gain` and `peak` normalization fields. For `playback: "remote"`, the plugin controls playback elsewhere through the retained remote API.
+
+Plugin install links use `mygo-music-lite://install-plugin?repo=owner/repo`; development builds use `mygo-music-lite-dev://`. The upstream README's `mygo-music://` links target the original app.
