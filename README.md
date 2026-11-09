@@ -14,35 +14,32 @@ Release bundles are Developer ID signed and notarized. See [release instructions
 
 ## Playback
 
-AVPlayer plays local files and direct HTTP(S) audio first. If it fails, the app tries Homebrew's libmpv once. libmpv is optional, loaded only when needed, and is not bundled.
+FFmpeg decodes local files and direct HTTP(S) audio; miniaudio sends the decoded audio to the output device. Both libraries are bundled, so common formats need no separate playback dependency. Homebrew's libmpv remains an optional fallback for a failed track (`brew install mpv`).
 
-```sh
-brew install mpv
-```
+The library retains folders, tags, covers, playlists, search, ordinary line-synced lyrics, queue controls, session restore, and media keys. Local scanning includes MP3, FLAC, Ogg, Opus, WAV, M4A, AAC, AIFF, WMA, APE, WavPack, and WebM. The bundled backend includes decoders for these formats; unsupported variants can use the optional fallback.
 
-Without libmpv, supported files still play through AVPlayer. Unsupported files show an installation hint. The app does not install dependencies automatically.
+There is no spectrum, lyric stage, word animation, speech transcription, persistent audio cache, normalization, fade, or gapless playback. Image caching and manually saving a file remain.
 
-The library retains folders, tags, covers, playlists, search, ordinary line-synced lyrics, queue controls, session restore, and media keys. Local scanning includes MP3, FLAC, Ogg, Opus, WAV, M4A, AAC, AIFF, WMA, APE, WavPack, and WebM. Actual codec support depends on the engine and macOS version.
+Direct HTTP(S) audio plays through a per-track loopback relay. It forwards byte ranges for seeking, applies plugin headers only to the original origin, and checks plugin network permissions on redirects. FFmpeg reads fragmented MP4 directly, without an intermediate HLS conversion. External HLS, DASH, and playlist URLs remain unsupported. Network sources need permission for the audio host and every redirect host, including CDNs.
 
-There is no PCM processing, spectrum, lyric stage, word animation, speech transcription, persistent audio cache, normalization, fade, or gapless playback. Image caching and manually saving a file remain.
-
-Direct HTTP(S) audio plays through a per-track loopback relay. It forwards byte ranges for seeking, applies plugin headers only to the original origin, and checks plugin network permissions on redirects. For supported indexed fragmented MP4 audio, the relay generates an internal HLS playlist so AVPlayer can start and seek without scanning the entire file. External HLS, DASH, and playlist URLs remain unsupported. Network sources need permission for the audio host and every redirect host, including CDNs.
-
-The relay reads a small format probe and streams bytes on native-engine demand. It does not decode, transcode, or save a complete track. Paused engines can retain or finish filling their own buffers. Playback stops when a network read stalls for 30 seconds. Native codec support still depends on AVPlayer or libmpv.
+The relay reads a small format probe and streams bytes on engine demand. It does not decode, transcode, or save a complete track. Paused engines can retain or finish filling their own buffers. Playback stops when a network read stalls for 30 seconds. The output uses a bounded PCM buffer.
 
 The app uses its own identifier, URL scheme, and data directory. It does not import upstream settings or install upstream app updates. Lite releases have their own version. See [differences from upstream](docs/fork-changes.md) for the playback changes and plugin compatibility limits.
 
 ## Build
 
-Requires macOS 13 or later on Apple Silicon, Xcode Command Line Tools, Go as specified in `go.mod`, and Bun. The AVPlayer bridge needs cgo.
+Requires macOS 13 or later on Apple Silicon, Xcode Command Line Tools, Go as specified in `go.mod`, and Bun. The audio bridge needs cgo; the first dependency build also needs curl and make.
 
 ```sh
+scripts/build-audio.sh
 CGO_ENABLED=1 go tool mygo dev
 CGO_ENABLED=1 go tool mygo build -platform darwin/arm64 -skip-dmg
 go test ./internal/...
 ```
 
 Open `build/darwin-arm64/MyGo Music Lite.app`. It is ad-hoc signed, not notarized.
+
+See [bundled library licenses and rebuilding](THIRD_PARTY.md). The playback libraries are portable, but this release of the application still supports macOS Apple Silicon only.
 
 See [playback verification](docs/playback-verification.md) for native tests and the CPU measurement command.
 

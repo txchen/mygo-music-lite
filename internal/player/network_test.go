@@ -13,13 +13,11 @@ import (
 	"mygo-music/internal/music"
 )
 
-// Player streams direct HTTP audio, pauses and seeks through the relay, including native fallback.
+// Player streams direct HTTP audio, pauses and seeks through the relay, including fragmented MP4 and WavPack.
 func TestNativeNetworkTransport(t *testing.T) {
-	for _, file := range []string{"seek.mp3", "seek.wv"} {
+	for _, file := range []string{"seek.mp3", "seek.wv", "seek-aac-frag.m4a", "seek-flac-frag.m4a"} {
 		t.Run(file, func(t *testing.T) {
-			if file == "seek.wv" && loadMPV() != nil {
-				t.Skip("optional Homebrew libmpv not installed")
-			}
+
 			var requests, denied atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				requests.Add(1)
@@ -53,11 +51,10 @@ func TestNativeNetworkTransport(t *testing.T) {
 				if p.Stream().URL != src.st.URL || p.relay == nil {
 					t.Error("original stream or relay lost")
 				}
-				if file == "seek.wv" {
-					if _, ok := p.out.(*mpvPlayer); !ok {
-						t.Errorf("WavPack did not fall back to mpv: %T", p.out)
-					}
+				if _, ok := p.out.(*portablePlayer); !ok {
+					t.Errorf("expected bundled backend, got %T", p.out)
 				}
+
 				p.TogglePlay()
 				paused = p.Position()
 			})

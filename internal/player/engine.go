@@ -3,7 +3,6 @@ package player
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"mygo-music/internal/music"
@@ -66,11 +65,7 @@ func (p *Player) startEngine(info *music.Stream, load engineLoad) {
 		}
 	}
 	info = p.engineInfo
-	if load.fallback && p.relay != nil && p.relay.hls != nil {
-		direct := *info
-		direct.URL = strings.TrimSuffix(p.relay.url, "/index.m3u8")
-		info = &direct
-	}
+
 	var out engine
 	var err error
 	if p.openEngine != nil {
@@ -78,7 +73,7 @@ func (p *Player) startEngine(info *music.Stream, load engineLoad) {
 	} else if load.fallback {
 		out, err = openMPV(info)
 	} else {
-		out, err = openAVPlayer(info)
+		out, err = openPortable(info)
 	}
 	if err != nil {
 		p.engineFailed(err, load)
@@ -121,7 +116,7 @@ func (p *Player) engineFailed(err error, load engineLoad) {
 		p.relay = nil
 	}
 	p.loading = false
-	p.loadFailed(p.track.Source, fmt.Errorf("AVPlayer: %v; libmpv: %w", load.primaryErr, err), load.at, load.skipped, load.dir)
+	p.loadFailed(p.track.Source, fmt.Errorf("FFmpeg/miniaudio: %v; libmpv: %w", load.primaryErr, err), load.at, load.skipped, load.dir)
 }
 
 // pollEngine checks native state without invalidating the window on every tick.
