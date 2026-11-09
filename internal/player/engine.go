@@ -44,14 +44,23 @@ type engineLoad struct {
 }
 
 func (p *Player) startEngine(info *music.Stream, load engineLoad) {
-	// Network audio needs separate redirect and credential handling. This
-	// local-only release must not forward plugin headers through native engines.
-	if _, local := music.PathOf(info.URL); !local {
-		p.loading = false
-		p.loadFailed(p.track.Source, errors.New("MyGo Music Lite currently supports local audio files only"), load.at, load.skipped, load.dir)
-		return
+	if !load.fallback {
+		p.info = info
+		p.engineInfo = info
+		if _, local := music.PathOf(info.URL); !local {
+			relay, err := newAudioRelay(info)
+			if err != nil {
+				p.loading = false
+				p.loadFailed(p.track.Source, err, load.at, load.skipped, load.dir)
+				return
+			}
+			p.relay = relay
+			native := *info
+			native.URL, native.Headers, native.AuthorizeURL = relay.url, nil, nil
+			p.engineInfo = &native
+		}
 	}
-	p.info = info
+	info = p.engineInfo
 	var out engine
 	var err error
 	if p.openEngine != nil {
@@ -80,11 +89,26 @@ func (p *Player) engineFailed(err error, load engineLoad) {
 		p.out.Close()
 		p.out = nil
 	}
+	if p.relay != nil && p.relay.Err() != nil {
+		err = p.relay.Err()
+		p.relay.Close()
+		p.relay = nil
+		p.loading = false
+		p.loadFailed(p.track.Source, err, load.at, load.skipped, load.dir)
+		return
+	}
 	p.loading = true
 	if !load.fallback {
 		load.fallback, load.primaryErr = true, err
 		p.startEngine(p.info, load)
 		return
+	}
+	if p.relay != nil {
+		if failure := p.relay.Err(); failure != nil {
+			err = failure
+		}
+		p.relay.Close()
+		p.relay = nil
 	}
 	p.loading = false
 	p.loadFailed(p.track.Source, fmt.Errorf("AVPlayer: %v; libmpv: %w", load.primaryErr, err), load.at, load.skipped, load.dir)
@@ -98,6 +122,9 @@ func (p *Player) pollEngine() {
 		return
 	}
 	state, err := out.Poll()
+	if p.relay != nil && p.relay.Err() != nil {
+		err = p.relay.Err()
+	}
 	if err == nil && state == outputLoading && p.now().Sub(p.engineLoad.started) > 20*time.Second {
 		err = errors.New("audio did not become ready within 20 seconds")
 	}

@@ -56,6 +56,8 @@ type Player struct {
 	track      *music.Track
 	out        Transport
 	info       *music.Stream // what the current track streams
+	relay      *audioRelay
+	engineInfo *music.Stream
 	openEngine func(*music.Stream, bool) (engine, error)
 	engineLoad engineLoad
 	polling    bool
@@ -500,6 +502,11 @@ func (p *Player) Duration() time.Duration {
 }
 
 func (p *Player) stop() {
+	if p.relay != nil {
+		p.relay.Close()
+		p.relay = nil
+	}
+	p.engineInfo = nil
 	if p.out != nil {
 		p.out.Close()
 	}

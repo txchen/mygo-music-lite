@@ -3,6 +3,7 @@ package plugin
 import (
 	"errors"
 	"log"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -296,6 +297,18 @@ func (p *Plugin) Stream(id, quality string) (*music.Stream, error) {
 				s.Headers[k] = v
 			}
 		}
+	}
+	p.mu.Lock()
+	opts := p.webOptions()
+	p.mu.Unlock()
+	s.AuthorizeURL = func(u *url.URL) error {
+		if opts.Client == nil {
+			return errors.New("audio URL needs the network permission")
+		}
+		if opts.Allow != nil {
+			return opts.Allow(&http.Request{URL: u})
+		}
+		return nil
 	}
 	return &s, nil
 }

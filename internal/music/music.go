@@ -5,6 +5,7 @@ package music
 
 import (
 	"errors"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -253,6 +254,8 @@ type Stream struct {
 	Peak    float64           `json:"peak,omitempty"`
 	Gain    float64           `json:"gain,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`
+	// AuthorizeURL checks the source permission for each network request and redirect.
+	AuthorizeURL func(*url.URL) error `json:"-"`
 }
 
 // Lyrics are a track's words: as LRC, the simple way, or as timed Lines, which
