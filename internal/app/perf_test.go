@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,6 +10,37 @@ import (
 	"mygo-music/internal/lyrics"
 	"mygo-music/internal/music"
 )
+
+// The visible and accessible playback clock keeps ticking on Home and Now Playing,
+// even when the progress bar no longer requests its own frequent frames.
+func TestPlaybackClockRefresh(t *testing.T) {
+	for _, nowPlaying := range []bool{false, true} {
+		t.Run(fmt.Sprintf("nowPlaying=%t", nowPlaying), func(t *testing.T) {
+			a := newTestApp()
+			a.pl.Cue([]music.Track{song("7", "Clock")})
+			a.pl.SetLyrics(nil)
+			out := &testTransport{pos: 12 * time.Second, playing: true}
+			a.pl.Attach(out)
+			a.nowPlaying = nowPlaying
+			tt := ui.NewTester(a.view, 1200, 800)
+			tt.SetPreferences(ui.Preferences{ReduceMotion: true})
+			tt.Advance(2 * time.Second)
+			for range 220 {
+				out.pos += 10 * time.Millisecond
+				tt.Advance(10 * time.Millisecond)
+			}
+			if _, ok := tt.AccessByRole(ui.RoleText, "0:14"); !ok {
+				t.Fatal("playback clock did not update with the audio position")
+			}
+			a.pl.TogglePlay()
+			tt.Frame()
+			tt.Advance(2 * time.Second)
+			if _, ok := tt.AccessByRole(ui.RoleText, "0:14"); !ok {
+				t.Fatal("paused clock changed")
+			}
+		})
+	}
+}
 
 // playingApp is an app playing a track with lyrics, at a position the test
 // sets with pl.Seek, and the number of times its view was built.
