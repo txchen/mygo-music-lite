@@ -91,7 +91,7 @@ func openMPV(st *music.Stream) (engine, error) {
 		"config": "no", "load-scripts": "no", "terminal": "no", "vid": "no",
 		"audio-display": "no", "idle": "yes", "keep-open": "no", "pause": "yes",
 		"input-default-bindings": "no", "input-vo-keyboard": "no", "osc": "no",
-		"replaygain": "no", "volume": "0",
+		"replaygain": "no", "volume": "0", "access-references": "no", "autoload-files": "no",
 	}
 	for k, v := range options {
 		if err := mpvError(mpvAPI.option(p.handle, k, v)); err != nil {

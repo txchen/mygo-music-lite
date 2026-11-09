@@ -14,7 +14,7 @@ Release bundles are Developer ID signed and notarized. See [release instructions
 
 ## Playback
 
-AVPlayer plays local audio first. If it fails, the app tries Homebrew's libmpv once. libmpv is optional, loaded only when needed, and is not bundled.
+AVPlayer plays local files and direct HTTP(S) audio first. If it fails, the app tries Homebrew's libmpv once. libmpv is optional, loaded only when needed, and is not bundled.
 
 ```sh
 brew install mpv
@@ -26,7 +26,9 @@ The library retains folders, tags, covers, playlists, search, ordinary line-sync
 
 There is no PCM processing, spectrum, lyric stage, word animation, speech transcription, persistent audio cache, normalization, fade, or gapless playback. Image caching and manually saving a file remain.
 
-Native playback supports local audio files only. Plugin APIs remain, but native network playback is disabled.
+Direct HTTP(S) audio plays through a per-track loopback relay. It forwards byte ranges for seeking, applies plugin headers only to the original origin, and checks plugin network permissions on redirects. HLS, DASH, and playlist URLs are unsupported. Network sources need permission for the audio host and every redirect host, including CDNs.
+
+The relay reads a small format probe and streams bytes on native-engine demand. It does not decode, transcode, or save a complete track. Paused engines can retain or finish filling their own buffers. Playback stops when a network read stalls for 30 seconds. Native codec support still depends on AVPlayer or libmpv.
 
 The app uses its own identifier, URL scheme, and data directory. It does not import upstream settings or install upstream app updates. Lite releases have their own version. See [differences from upstream](docs/fork-changes.md) for the playback changes and plugin compatibility limits.
 
@@ -142,7 +144,7 @@ Put the translations in `locales/<language>.json` next to `plugin.json`: `locale
 
 The app translates the plugin's `name`, its settings' `label` and `help` and its `navigation` titles with them. For what the plugin says itself, such as a page's titles or an error's message, `host.t(text)` answers the translation, or `text` when there's none, and `host.language()` the listener's language, `en` or `zh-CN`. Both follow the listener as they change it, and the page they're on loads again.
 
-With `"playback": "stream"`, this version plays local file URLs returned by `stream`. Native network streams are disabled. With `"playback": "remote"`, the plugin makes the sound itself, or has another program do so, and the app calls the `remote` functions and polls `remoteState`.
+With `"playback": "stream"`, Lite plays local file URLs and direct HTTP(S) audio files returned by `stream`. HLS, DASH, and playlists are unsupported. Declare the audio host and redirect CDN hosts in `permissions.network`. With `"playback": "remote"`, the plugin makes the sound itself, or has another program do so, and the app calls the `remote` functions and polls `remoteState`.
 
 Throw an error with a `code` to say what's wrong: `signIn` prompts the listener to sign in, `setup` sends them to the plugin's settings, `unavailable` means this can't be played, and `unsupported` means the plugin doesn't do this. Any other error shows its message.
 
@@ -186,7 +188,7 @@ Everything else takes a permission in `plugin.json`:
   ]
   ```
 
-  `hosts` are hosts or `*.domain`, which the network permission has to reach, or `{setting:key}`, the host of the server a setting names, such as `https://nas.local:5666`, while the network permission reaches it. `*` isn't one. Without `kinds`, they go with both. In `headers`, `{setting:key}` is what the listener filled in and `{storage:key}` what the plugin keeps with `host.storage`, as each is when the request goes out: a token the plugin stores anew goes with the next one, and none is kept in a URL. A header whose value isn't there yet, as before signing in, is left out. The headers a `stream` answers come first. Image and manual-download requests do not forward these headers to another host on redirect. Native network playback is disabled in this version.
+  `hosts` are hosts or `*.domain`, which the network permission has to reach, or `{setting:key}`, the host of the server a setting names, such as `https://nas.local:5666`, while the network permission reaches it. `*` isn't one. Without `kinds`, they go with both. In `headers`, `{setting:key}` is what the listener filled in and `{storage:key}` what the plugin keeps with `host.storage`, as each is when the request goes out: a token the plugin stores anew goes with the next one, and none is kept in a URL. A header whose value isn't there yet, as before signing in, is left out. The headers a `stream` answers come first. Image and manual-download requests do not forward these headers to another host on redirect. For native network audio, headers stay on the exact original origin, including scheme and port. After any origin change, they remain stripped even if a redirect returns to that origin. HTTPS redirects to HTTP are rejected. Audio URL credentials must be in headers or signed query parameters, rather than URL user information.
 - `"process": ["bin/helper-*", "ffmpeg"]` lists the programs `host.spawn` can start, for what JavaScript can't do: a path from the plugin's folder or absolute, or a name looked up on `PATH`. A path only matches a path and a name only a name, and `*` matches within one folder, as in a glob. `["*"]`, or `true`, asks for any program, which the listener is warned about. The listener has to allow it in Settings first, as a program can do anything they can. Programs end when the plugin does, and once allowed, `fetch` can reach this machine too, to talk to them. Ship one binary per platform and pick it with `host.platform` and `host.arch`.
 
 ## Credits
