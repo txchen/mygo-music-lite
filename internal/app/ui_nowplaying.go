@@ -291,14 +291,9 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *music.Track, art *artwork, accen
 	switch episode := tr.ShowID != ""; {
 	case episode && a.npPane == paneWall:
 		a.npPane = paneQueue
-	case episode && (a.npPane == paneLyrics || a.npPane == paneStage):
+	case episode && a.npPane == paneLyrics:
 		a.npPane = paneShow
-		if a.captionsOn() {
-			a.npPane = paneCaptions
-		}
-	case episode && a.npPane == paneCaptions && !a.captionsShown():
-		a.npPane = paneShow
-	case !episode && (a.npPane == paneShow || a.npPane == paneCaptions):
+	case !episode && a.npPane == paneShow:
 		a.npPane = a.lyricsPaneChosen()
 	}
 	if a.npPane == paneComments && !a.trackLib(tr).can("comments") {
@@ -320,17 +315,6 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *music.Track, art *artwork, accen
 				}
 			})
 		})
-		if a.npPane == paneStage {
-			// The stage takes the whole view: the lyrics are the show, the
-			// controls a slim bar at the foot.
-			a.npRise(reveal(npTabsRow(c, w), pointerIn), 0).Children(func() {
-				a.paneTabs(c)
-				a.stageStyleButton(c)
-			})
-			a.stage(c, tr, accent)
-			a.stageBar(c, tr, art, accent)
-			return
-		}
 		if a.npPane == paneWall {
 			// The wall takes the whole view too, under the song playing.
 			a.wallPane(c, tr, art, accent, w, h, pointerIn)
@@ -421,8 +405,6 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *music.Track, art *artwork, accen
 					a.commentsPane(c, tr)
 				case paneShow:
 					a.showPane(c, tr)
-				case paneCaptions:
-					a.captionsPane(c, tr, h)
 				default:
 					a.queuePane(c)
 				}
@@ -466,21 +448,14 @@ func reveal(e ui.Element, shown bool) ui.Element {
 // lyricsPaneChosen is the pane of lyrics the listener chose last: what
 // the app starts on, before the player is made. Now Playing shows what an
 // episode is about in place of either.
-func (a *app) lyricsPaneChosen() int {
-	if a.settings.LyricsStage {
-		return paneStage
-	}
-	return paneLyrics
-}
+func (a *app) lyricsPaneChosen() int { return paneLyrics }
 
 // The panes of Now Playing.
 const (
 	paneLyrics = iota
 	paneQueue
-	paneStage
 	paneComments
 	paneShow
-	paneCaptions
 	paneWall
 )
 
@@ -497,12 +472,9 @@ func (a *app) npTabs() []npTab {
 	var tabs []npTab
 	if tr != nil && tr.ShowID != "" {
 		tabs = []npTab{{paneShow, T("About")}}
-		if a.captionsShown() {
-			tabs = append(tabs, npTab{paneCaptions, T("Captions")})
-		}
 		tabs = append(tabs, npTab{paneQueue, T("Up Next")})
 	} else {
-		tabs = []npTab{{paneLyrics, T("Lyrics")}, {paneStage, T("Stage")}, {paneQueue, T("Up Next")}, {paneWall, T("Wall")}}
+		tabs = []npTab{{paneLyrics, T("Lyrics")}, {paneQueue, T("Up Next")}, {paneWall, T("Wall")}}
 	}
 	if tr != nil && a.trackLib(tr).can("comments") {
 		tabs = append(tabs, npTab{paneComments, T("Comments")})
@@ -518,13 +490,7 @@ func (a *app) paneTabs(c *ui.Context) {
 
 // choosePane shows pane i in Now Playing, remembering lyrics or the stage,
 // whichever was chosen, for the next song.
-func (a *app) choosePane(i int) {
-	a.npPane = i
-	if (i == paneLyrics || i == paneStage) && a.settings.LyricsStage != (i == paneStage) {
-		a.settings.LyricsStage = i == paneStage
-		a.settings.save()
-	}
-}
+func (a *app) choosePane(i int) { a.npPane = i }
 
 // radioChip says which radio plays, over the title: a click on it, or on
 // its cross, leaves the radio, playing on the song.
@@ -554,38 +520,6 @@ func qualityBadge(c *ui.Context, st *music.Stream) {
 	}
 	ui.Text(c, T("Lossless")).FontSize(9.5).FontWeight(800).LetterSpacing(0.6).TextColor(ui.Hex("#f5d58a")).
 		Padding(1, 6).Radius(4).Border(1, ui.Hex("#f5d58a").Alpha(0.55))
-}
-
-// stageBar is the slim bar along the foot of the stage: what plays, where
-// it is, and the controls.
-func (a *app) stageBar(c *ui.Context, tr *music.Track, art *artwork, accent ui.Color) {
-	pl := a.pl
-	ui.Column(c).Padding(0, 48, 28, 48).Gap(10).Children(func() {
-		a.npRise(a.scrubber(c.Key("stage-scrub"), &a.npScrub, white.Alpha(0.18), white.Alpha(0.9), 14, accent.Mix(white, 0.35)), 2)
-		ui.Row(c).Gap(14).AlignItems(ui.Center).Children(func() {
-			ui.Row(c).Grow(1).Basis(0).MinWidth(0).Gap(12).AlignItems(ui.Center).Children(func() {
-				if bmp := bitmap(art); bmp != nil {
-					cov := a.npMorph(c, ui.Box(c.Key(tr.ID)).Size(44, 44))
-					in := artIn(cov, bmp)
-					cov.Children(func() { artImage(c, bmp, a.npRadius(c, 8, 44), in) })
-				}
-				// All but the cover, which flies to the bar's, fade as the
-				// rest of Now Playing does.
-				a.npRise(ui.Row(c).Shrink(1).MinWidth(0).Gap(12).AlignItems(ui.Center), 3).Children(func() {
-					ui.Column(c).Shrink(1).MinWidth(0).Gap(2).Children(func() {
-						ui.Text(c, tr.Name).FontSize(14).FontWeight(700).SingleLine()
-						a.artistLinks(c, tr, white.Alpha(0.55), white).FontSize(12).SingleLine()
-					})
-					a.likeButton(c.Key("like"), tr, 17, white.Alpha(0.6))
-					a.songMenu(c.Key("more"), tr, 17, white.Alpha(0.6)).Margin(0, 0, 0, -10)
-				})
-			})
-			a.npRise(ui.Row(c), 3).Children(func() { a.transport(c, white, white.Alpha(0.45), white, 22) })
-			a.npRise(ui.Row(c).Grow(1).Basis(0).MinWidth(0).Justify(ui.End), 4).Children(func() {
-				ui.Text(c, clock(pl.Position())+" / "+clock(pl.Duration())).FontSize(11.5).FontFeatures("tnum").TextColor(white.Alpha(0.5))
-			})
-		})
-	})
 }
 
 func (a *app) paneTab(c *ui.Context, i int, label string) {
@@ -706,21 +640,7 @@ func (a *app) timedLines(c *ui.Context, scroll ui.Element, lines []lyrics.Line, 
 					text := ui.Column(c).AlignItems(ui.Start).Gap(6)
 					text.AnimatePose(ui.Pose{Fade: 1 - alpha}, ui.Animation{Duration: 380 * time.Millisecond})
 					text.Children(func() {
-						if on && len(l.Words) > 0 {
-							// The line sung lights up word by word as it is sung.
-							ui.RichText(c.Key("words")).Lang(lang).FontSize(st.size).FontWeight(st.weight).LineHeight(st.lineHeight).LetterSpacing(-0.4).Children(func() {
-								for wi, wd := range l.Words {
-									lit := clamp01(float32((pos - wd.Start).Seconds() / max(0.05, (wd.End-wd.Start).Seconds())))
-									ui.Text(c.Key(wi), wd.Text).TextColor(white.Alpha(0.38 + 0.62*lit))
-								}
-							})
-							if pl.Playing() {
-								// Words brighten smoothly enough at 25 frames a second.
-								c.After(40 * time.Millisecond)
-							}
-						} else {
-							ui.Text(c, l.Text).Lang(lang).FontSize(st.size).FontWeight(st.weight).LineHeight(st.lineHeight).LetterSpacing(-0.4).TextColor(white)
-						}
+						ui.Text(c, l.Text).Lang(lang).FontSize(st.size).FontWeight(st.weight).LineHeight(st.lineHeight).LetterSpacing(-0.4).TextColor(white)
 						if l.Translation != "" {
 							ui.Text(c, l.Translation).FontSize(17).FontWeight(600).TextColor(white.Alpha(0.7))
 						}

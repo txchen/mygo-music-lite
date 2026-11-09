@@ -26,8 +26,7 @@ func (s streamer) Stream(id, quality string) (*music.Stream, error) {
 	return &st, nil
 }
 
-// A song saved comes from its source with the headers the source says it
-// needs, and a song kept in the cache is saved from there, without asking.
+// Saving a song sends the headers required by its source.
 func TestSaveSong(t *testing.T) {
 	audio := []byte("ID3 not really a song")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +40,6 @@ func TestSaveSong(t *testing.T) {
 	var asked int
 	src := streamer{st: music.Stream{URL: srv.URL, Type: "flac", Headers: map[string]string{"Authorization": "Bearer token"}}, asked: &asked}
 	p := New(func(func()) {})
-	p.Cache = NewCache(t.TempDir(), 1<<30)
 	dir := t.TempDir()
 
 	song, err := p.FindSong(src, music.Track{ID: "1", Source: "src"}, "high")
@@ -59,27 +57,6 @@ func TestSaveSong(t *testing.T) {
 		t.Errorf("saved %q", b)
 	}
 
-	kept := []byte("kept in the cache")
-	st := &music.Stream{Quality: "lossless", Type: "ogg"}
-	f := p.Cache.part(st)
-	f.Write(kept)
-	f.Close()
-	p.Cache.keep("src", "2", "lossless", st, f.Name(), int64(len(kept)))
-	asked = 0
-	song, err = p.FindSong(src, music.Track{ID: "2", Source: "src"}, "high")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if asked != 0 || song.Type != "ogg" {
-		t.Errorf("asked the source %d times, for a song of type %q", asked, song.Type)
-	}
-	path = filepath.Join(dir, "b.ogg")
-	if err := song.SaveTo(path); err != nil {
-		t.Fatal(err)
-	}
-	if b, _ := os.ReadFile(path); !bytes.Equal(b, kept) {
-		t.Errorf("saved %q", b)
-	}
 }
 
 // A song cut short on its way leaves the file it was to replace as it was, and

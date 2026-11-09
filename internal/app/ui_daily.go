@@ -11,7 +11,6 @@ import (
 
 	"mygo-music/internal/i18n"
 	"mygo-music/internal/music"
-	"mygo-music/internal/player"
 )
 
 // featureCard leads a source's Home: the songs of its first section, in the
@@ -58,29 +57,17 @@ func (a *app) featureCard(c *ui.Context, sec *music.Section, pageID string, at i
 		out = 0.6
 	}
 	out = card.AnimateTo("out", out, ui.Animation{Spring: ui.SpringOptions{Duration: 700 * time.Millisecond, Bounce: 0.25}})
-	turn := 0.0
-	switch {
-	case still:
-	case playing:
-		turn = 1
-	case hovered:
-		turn = 0.12
-	}
 	showStack, showPicks, showDay := inner >= 620, inner >= 1040, inner >= 900
 	backdrop := backdrop(art)
 
 	card.Children(func() {
 		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).PassThrough().Draw(func(p *ui.Painter, r ui.Rect) {
-			spin := &a.dailySpin
-			if spin.step(p.Now(), turn) {
-				p.AnimationFrameRate(dailyRate)
-			}
 			// Where the record turns: at the right, in its sleeve's stack.
 			cx := r.X + r.W - dailyPadX - 120
 			if showStack {
 				cx = r.X + r.W - dailyPadX - stackWidth + sleeveLeft + sleeveSize/2 + recordOut(out)
 			}
-			drawDailyBackdrop(p, r, backdrop, deep, rich, glow, cx, float32(spin.ripple), sweep)
+			drawDailyBackdrop(p, r, backdrop, deep, rich, glow, cx, 0, sweep)
 			// The day, set huge and faint after the words, cut off by the
 			// foot, where the covers leave it room.
 			if showDay {
@@ -156,13 +143,6 @@ const (
 	sleeveSize  = 156
 	recordSize  = 146
 )
-
-// dailyRate is how many frames a second the daily card draws what moves
-// on it, its record turning and the bars on its play button: every frame
-// of a 120 Hz display, it redrew the whole card 120 times a second, for
-// motion that looks as smooth at half of that; at a quarter, the record's
-// label steps.
-const dailyRate = 60
 
 // recordOut is how far right of its sleeve's middle the record's is, as
 // far out as out.
@@ -248,43 +228,7 @@ func b2f(b bool) float32 {
 	return 0
 }
 
-// spinState turns the daily card's record: its angle, in degrees, how far
-// the grooves around it have rippled out, up to a groove, and how fast it
-// turns, as a part of a turntable's speed, which eases up and glides to a
-// stop.
-type spinState struct {
-	angle, ripple, speed float64
-	last                 time.Time
-}
-
-// The grooves around the record are rippleGap apart, and ripple out a
-// groove every ripplePeriod at a turntable's speed. Each step they take
-// redraws most of the card, in each of the window's buffers in turn: at a
-// groove a turn, 1.8 seconds, by pixels of a Retina display, they took 20
-// steps a second while the card's songs played; by points, a groove in 6
-// seconds, they take 3.
-const (
-	rippleGap    = 18
-	ripplePeriod = 6.0 // seconds
-)
-
-// step turns the record on to now, its speed easing to to, and reports
-// whether it still turns.
-func (s *spinState) step(now time.Time, to float64) bool {
-	dt := now.Sub(s.last).Seconds()
-	if s.last.IsZero() || dt > 0.2 {
-		dt = 1.0 / 60
-	}
-	s.last = now
-	s.speed += (to - s.speed) * min(1, 2.2*dt)
-	if math.Abs(to-s.speed) < 0.002 {
-		s.speed = to
-	}
-	// 33⅓ turns a minute.
-	s.angle = math.Mod(s.angle+s.speed*dt*200, 360)
-	s.ripple = math.Mod(s.ripple+s.speed*dt*rippleGap/ripplePeriod, rippleGap)
-	return s.speed > 0
-}
+const rippleGap = 18
 
 // dailyArtists names the first few singers of songs, and how many songs.
 func dailyArtists(songs []music.Track) string {
@@ -340,15 +284,7 @@ func (a *app) dailyPlayButton(c *ui.Context, songs []music.Track, ours, playing 
 	b.Label(label)
 	b.Children(func() {
 		if playing && !b.Hovered() {
-			accent := a.pal.accent
-			ui.Box(c).Size(14, 13).Draw(func(p *ui.Painter, r ui.Rect) {
-				lv, live := a.pl.Levels()
-				a.dailyBars.step(p.Now(), lv, live)
-				drawBars(p, r, &a.dailyBars, 4, accent, 2.5)
-				if live || a.dailyBars.group(0, player.Bands) > 0.01 {
-					p.AnimationFrameRate(dailyRate)
-				}
-			})
+			ui.Icon(c, iconVolume).Size(14, 13).TextColor(a.pal.accent)
 		} else {
 			icon := iconPlay
 			if playing {
@@ -424,7 +360,7 @@ func (a *app) dailyStack(c *ui.Context, songs []music.Track, fanned bool, out fl
 		ui.Box(c.Key("record")).Absolute().Left(mid+recordOut(out)-recordSize/2).Top((sleeveSize-recordSize)/2).
 			Size(recordSize, recordSize).Radius(recordSize/2).Shadow(0, 8, 20, -4, ui.RGBA(0, 0, 0, 0.5)).
 			Draw(func(p *ui.Painter, r ui.Rect) {
-				drawRecord(p, r, bitmap(a.art.get(sized(songs[0].Album.ImageURL, 240), false)), float32(a.dailySpin.angle))
+				drawRecord(p, r, bitmap(a.art.get(sized(songs[0].Album.ImageURL, 240), false)), 0)
 			})
 		// The sleeve.
 		sleeve := ui.Box(c.Key("sleeve")).Absolute().Left(sleeveLeft).Top(0).Size(sleeveSize, sleeveSize).Radius(12).

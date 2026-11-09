@@ -72,7 +72,6 @@ type app struct {
 
 	wasBehind bool // the window wasn't at the front as last built
 
-	captions  captionState    // the episode playing's captions, and the model they take
 	installer pluginInstaller // installing and updating plugins
 	// links are the app's links opened before its window was made, macOS
 	// handing over the one it was started with first.
@@ -94,8 +93,6 @@ type app struct {
 	naming      nameDialog         // the name of a playlist asked for
 	deleting    deleteDialog       // whether to delete a playlist, asked
 	toast       string             // a message to show once
-	dailySpin   spinState          // the record on the feature card
-	dailyBars   barState           // the bars on its play button
 	settingText map[string]*string // the settings of sources, as being typed
 
 	trackList ui.ListState
@@ -143,7 +140,6 @@ type app struct {
 	volumeOpen bool // the volume popover of the player bar shows
 	mutedFrom  float64
 
-	rowBars barState
 	// underTop and underBottom say whether the page has content under its
 	// bars, which show their scroll edges then.
 	underTop, underBottom bool
@@ -159,8 +155,6 @@ type app struct {
 
 	settings    settings
 	settingsWin *mygo.Window
-	cacheUsed   int64 // the bytes the song cache takes, -1 until measured
-	updates     bool  // the update plugin is used (useUpdater)
 
 	restored     bool   // playback picked up where it was left
 	savedSession string // the session as last kept
@@ -330,9 +324,7 @@ func Run() error {
 		settingText: map[string]*string{},
 		lyricAt:     -1,
 		queueAt:     -1,
-		cacheUsed:   -1,
 	}
-	a.useUpdater(i18n.Resolve(loadSettings().Language, systemLanguages()))
 	mygo.App.WhenReady(func() {
 		a.settings = loadSettings()
 		a.settings.applyAppearance()
@@ -347,12 +339,7 @@ func Run() error {
 		a.pl.Source = a.sourceByID
 		a.pl.Failed = a.sourceFailed
 		a.pl.Quality = func() string { return a.settings.Quality }
-		a.pl.Normalize = func() bool { return a.settings.Normalize }
-		a.pl.Cache = newSongCache(a.settings.CacheMB)
-		a.pl.Changed = func() {
-			a.keepSession()
-			a.syncCaptions()
-		}
+		a.pl.Changed = a.keepSession
 		a.volume = a.settings.Volume
 		a.pl.SetVolume(a.volume)
 		a.win = mygo.NewWindow(mygo.WindowOptions{
@@ -424,6 +411,9 @@ func Run() error {
 	mygo.App.OnWillQuit(func(*mygo.QuitEvent) {
 		if a.tray != nil {
 			a.tray.Destroy()
+		}
+		if a.pl != nil {
+			a.pl.Close()
 		}
 		a.closeSources()
 	})

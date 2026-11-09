@@ -1,5 +1,5 @@
 {
-  "name": "mygo-music",
+  "name": "mygo-music-lite",
   "private": true,
   "workspaces": [
     "website"

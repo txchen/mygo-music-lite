@@ -11,7 +11,7 @@
 # quit first.
 set -euo pipefail
 
-name="MyGo Music"
+name="MyGo Music Lite"
 id="dev.egoist.mygomusic"
 release=0 songs=0
 for arg in "$@"; do

@@ -12,22 +12,17 @@ import (
 	"mygo-music/internal/music"
 )
 
-// Song is a track's audio found for the listener to keep a copy of, in a file
-// of their own: kept in the cache, a file on disk, or at its source.
+// Song is the audio to copy into a file chosen by the listener.
 type Song struct {
 	// Type is its file's: one of songTypes, as its source said.
 	Type string
-	file *os.File      // kept in the cache, or on disk
+	file *os.File      // a local file
 	st   *music.Stream // or else where it streams from
 }
 
-// FindSong finds track t of src at quality, to save, as the player would play
-// it: kept in the cache, or as src streams it. It blocks, for src is asked; run
-// it off the main thread, and close what it returns, or save it.
+// FindSong resolves a track for a manual download. Call it off the main
+// thread, then close or save the returned song.
 func (p *Player) FindSong(src music.Source, t music.Track, quality string) (*Song, error) {
-	if f, st, ok := p.Cache.find(t.Source, t.ID, quality); ok {
-		return &Song{Type: st.Type, file: f}, nil
-	}
 	if src == nil {
 		return nil, errNoSource
 	}
@@ -48,11 +43,9 @@ func (p *Player) FindSong(src music.Source, t music.Track, quality string) (*Son
 }
 
 // songTypes are the types of song the app knows, which name their files.
-var songTypes = []string{"mp3", "flac", "ogg", "wav", "m4a", "aac"}
+var songTypes = []string{"mp3", "flac", "ogg", "oga", "opus", "wav", "m4a", "aac", "aif", "aiff", "wma", "ape", "wv", "webm"}
 
-// songType is the type a stream says it is, to name its file by: one the app
-// knows, or else mp3, as the cache takes it. What a source sent may hold
-// anything.
+// songType limits the filename extension to known audio containers.
 func songType(typ string) string {
 	if typ = strings.ToLower(typ); slices.Contains(songTypes, typ) {
 		return typ

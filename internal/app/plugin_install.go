@@ -28,9 +28,9 @@ import (
 // development app's is its own, which leaves the installed app's links to it.
 var linkScheme = func() string {
 	if mygo.IsDev() {
-		return "mygo-music-dev"
+		return "mygo-music-lite-dev"
 	}
-	return "mygo-music"
+	return "mygo-music-lite"
 }()
 
 // These reach GitHub, and the disk; tests replace them.

@@ -19,7 +19,6 @@ func (a *app) setMenu() {
 	name := mygo.App.Name()
 	appMenu := []*mygo.MenuItem{
 		{Role: mygo.RoleAbout, Label: Tf("About %s", name)},
-		{Label: T("Check for Updates…"), Click: run(checkForUpdates)},
 		mygo.Separator(),
 		{Label: T("Settings…"), Accelerator: "CmdOrCtrl+,", Click: run(a.openSettings)},
 		mygo.Separator(),

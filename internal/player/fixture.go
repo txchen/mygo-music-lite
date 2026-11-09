@@ -3,8 +3,6 @@ package player
 import (
 	"time"
 
-	"github.com/egoist/mygo/audio"
-
 	"mygo-music/internal/lyrics"
 	"mygo-music/internal/music"
 )
@@ -36,7 +34,7 @@ func (p *Player) Hold(pos time.Duration) {
 }
 
 // Attach makes out the current track's audio, playing.
-func (p *Player) Attach(out *audio.Player) {
+func (p *Player) Attach(out Transport) {
 	p.out = out
 	p.playing = true
 }
