@@ -531,11 +531,11 @@ func TestWalkFinds(t *testing.T) {
 	write(t, filepath.Join(dir, "lower.flac"), fixture(t, "seek.flac"))
 	write(t, filepath.Join(dir, ".hidden", "no.mp3"), audio)
 	write(t, filepath.Join(dir, "._lower.mp3"), audio)
-	write(t, filepath.Join(dir, "no.wma"), audio)
+	write(t, filepath.Join(dir, "fallback.wma"), audio)
 	write(t, filepath.Join(dir, "empty.mp3"), nil)
 	s := scanned(t, dir)
 	got := names(songs(t, s))
-	if !slices.Equal(got, []string{"lower", "Upper"}) {
+	if !slices.Equal(got, []string{"fallback", "lower", "Upper"}) {
 		t.Errorf("found %q", got)
 	}
 }

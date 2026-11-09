@@ -10,7 +10,6 @@ import (
 	"mygo-music/internal/i18n"
 	"mygo-music/internal/local"
 	"mygo-music/internal/music"
-	"mygo-music/internal/player"
 )
 
 const pagePad = 40
@@ -537,17 +536,9 @@ func (a *app) trackRow(c *ui.Context, tracks []music.Track, i int, covers bool, 
 	}
 }
 
-// nowPlayingBars dance in the row of the track playing.
+// nowPlayingBars marks the playing track without a continuous animation.
 func (a *app) nowPlayingBars(c *ui.Context) {
-	color := a.pal.accent
-	ui.Box(c).Size(16, 14).Draw(func(p *ui.Painter, r ui.Rect) {
-		lv, live := a.pl.Levels()
-		a.rowBars.step(p.Now(), lv, live)
-		drawBars(p, r, &a.rowBars, 4, color, 2.5)
-		if live || a.rowBars.group(0, player.Bands) > 0.01 {
-			p.AnimationFrame()
-		}
-	})
+	ui.Icon(c, iconVolume).Size(16, 14).TextColor(a.pal.accent)
 }
 
 // sized names a cover by the size it shows at: the cache keeps it no bigger.

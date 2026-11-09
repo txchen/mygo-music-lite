@@ -69,15 +69,6 @@ func TestNowPlayingFrameBudget(t *testing.T) {
 	if n := framesAt(a, tt, 12*time.Second); n > lyricsFrames+3 {
 		t.Errorf("the wall, still: %d frames a second, the lyrics %d", n, lyricsFrames)
 	}
-	tt.SetPreferences(ui.Preferences{})
-	a.npPane = paneStage
-	a.settings.StageSparks = true
-	for _, s := range stageStyles {
-		a.settings.StageStyle = s.id
-		if n := framesAt(a, tt, 18*time.Second); n > 12 {
-			t.Errorf("the stage between lines, in %s: %d frames a second", s.label, n)
-		}
-	}
 }
 
 // Home with a source's own page, its feature card at rest while nothing plays,

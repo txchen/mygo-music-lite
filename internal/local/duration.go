@@ -1,10 +1,9 @@
 package local
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
-
-	"github.com/jfreymuth/oggvorbis"
 )
 
 // Tags don't say how long a song is, and decoding it all to find out would make
@@ -188,17 +187,50 @@ func countedFrames(frame []byte, h frameHeader) int64 {
 	return 0
 }
 
-// oggDuration reads an Ogg Vorbis file's milliseconds from its last page, or 0
-// if it isn't one, or is one the decoder panics on.
-func oggDuration(r io.ReaderAt, size int64) (ms int64) {
-	defer func() {
-		if recover() != nil {
-			ms = 0
-		}
-	}()
-	d, err := oggvorbis.NewReader(io.NewSectionReader(r, 0, size))
-	if err != nil || d.SampleRate() == 0 {
+// oggDuration reads identification and final page granules, never PCM.
+func oggDuration(r io.ReaderAt, size int64) int64 {
+	if size < 32 {
 		return 0
 	}
-	return d.Length() * 1000 / int64(d.SampleRate())
+	head := make([]byte, min(size, 65536))
+	r.ReadAt(head, 0)
+	var rate, preSkip int64
+	if i := bytes.Index(head, []byte("OpusHead")); i >= 0 && i+12 <= len(head) {
+		rate, preSkip = 48000, int64(binary.LittleEndian.Uint16(head[i+10:i+12]))
+	} else if i := bytes.Index(head, []byte("\x01vorbis")); i >= 0 && i+16 <= len(head) {
+		rate = int64(binary.LittleEndian.Uint32(head[i+12 : i+16]))
+	}
+	if rate <= 0 {
+		return 0
+	}
+	tail := make([]byte, min(size, 65536))
+	r.ReadAt(tail, size-int64(len(tail)))
+	var granule int64
+	for at := 0; at+27 <= len(tail); {
+		i := bytes.Index(tail[at:], []byte("OggS"))
+		if i < 0 {
+			break
+		}
+		at += i
+		if at+27 > len(tail) {
+			break
+		}
+		n := int(tail[at+26])
+		if tail[at+4] != 0 || at+27+n > len(tail) {
+			at++
+			continue
+		}
+		length := 27 + n
+		for _, v := range tail[at+27 : at+27+n] {
+			length += int(v)
+		}
+		if at+length > len(tail) {
+			at++
+			continue
+		}
+		g := int64(binary.LittleEndian.Uint64(tail[at+6 : at+14]))
+		granule = max(granule, g)
+		at += length
+	}
+	return max(0, granule-preSkip) * 1000 / rate
 }

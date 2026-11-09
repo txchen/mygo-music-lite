@@ -129,7 +129,6 @@ func (a *app) trayMenu() *mygo.Menu {
 		{Label: T("Like/Unlike"), Click: run(a.likeCurrent)},
 		mygo.Separator(),
 		{Label: T("Settings…"), Click: run(front(a.openSettings))},
-		{Label: T("Check for Updates…"), Click: run(front(checkForUpdates))},
 		mygo.Separator(),
 		{Label: Tf("Quit %s", name), Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
 	})

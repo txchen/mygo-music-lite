@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/egoist/mygo/audio"
-
 	"mygo-music/internal/music"
 	"mygo-music/internal/player"
 )
@@ -23,7 +21,7 @@ func TestSessionRestsWhilePaused(t *testing.T) {
 	a := newTestApp()
 	a.pl.Changed = a.keepSession
 	a.pl.Cue([]music.Track{song("7", "宝船")})
-	out := audio.NewPlayer(&silence{})
+	out := &testTransport{}
 	out.SetVolume(0)
 	out.Play()
 	a.pl.Attach(out)

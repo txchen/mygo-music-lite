@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/egoist/mygo/audio"
 	"github.com/egoist/mygo/ui"
 
 	"mygo-music/internal/music"
@@ -17,7 +16,7 @@ func TestScrubSeeksOnRelease(t *testing.T) {
 	a := newTestApp()
 	a.pl.Cue([]music.Track{song("7", "宝船"), {ID: "8", Name: "下一首"}})
 	a.pl.SetLyrics(nil)
-	out := audio.NewPlayer(&silence{})
+	out := &testTransport{}
 	out.SetVolume(0)
 	out.Play()
 	a.pl.Attach(out)

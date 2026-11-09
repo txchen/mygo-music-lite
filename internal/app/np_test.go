@@ -78,8 +78,8 @@ func TestQueueStaysAsATrackIsPlayed(t *testing.T) {
 // The app chooses Now Playing's pane before it makes the player: it
 // crashed on start when the choice asked the player what played.
 func TestLyricsPaneBeforePlayer(t *testing.T) {
-	a := &app{settings: settings{LyricsStage: true}}
-	if pane := a.lyricsPaneChosen(); pane != paneStage {
+	a := &app{}
+	if pane := a.lyricsPaneChosen(); pane != paneLyrics {
 		t.Errorf("pane %d", pane)
 	}
 }
@@ -138,7 +138,7 @@ func TestCmdNumberChoosesTab(t *testing.T) {
 		keys  []int // from 1, 0 for the last tab
 		panes []int
 	}{
-		{song("1", "宝船"), []int{4, 2, 1}, []int{paneWall, paneStage, paneLyrics}},
+		{song("1", "宝船"), []int{3, 2, 1}, []int{paneWall, paneQueue, paneLyrics}},
 		{music.Track{ID: "2", Name: "节目", ShowID: "9", Duration: 200000}, []int{0, 1}, []int{paneComments, paneShow}},
 	} {
 		a := newTestApp()
@@ -180,7 +180,7 @@ func TestNowPlayingTabsStayPut(t *testing.T) {
 	if !ok {
 		t.Fatal("no Lyrics tab")
 	}
-	for _, tab := range []string{"Stage", "Up Next", "Wall", "Lyrics"} {
+	for _, tab := range []string{"Up Next", "Wall", "Lyrics"} {
 		tt.Click(tab)
 		settle()
 		if a.npPane == paneLyrics && tab != "Lyrics" {
@@ -190,7 +190,7 @@ func TestNowPlayingTabsStayPut(t *testing.T) {
 			t.Errorf("on %s the Lyrics tab is at %v,%v, was at %v,%v", tab, r.X, r.Y, first.X, first.Y)
 		}
 	}
-	for _, pane := range []int{paneStage, paneLyrics} {
+	for _, pane := range []int{paneQueue, paneLyrics} {
 		a.npPane = pane
 		a.comments.loaded, a.comments.total = true, 0
 		settle()

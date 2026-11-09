@@ -1,57 +1,53 @@
-# Releasing
+# Publish MyGo Music Lite
 
-Releases are built by [`.github/workflows/release.yml`](.github/workflows/release.yml). Installed apps update to a release once it's published.
+Use macOS Apple Silicon, Xcode Command Line Tools, Go from `go.mod`, Bun, and authenticated GitHub CLI. The Developer ID certificate and its private key must be in the signing keychain. Store notarization credentials there with `xcrun notarytool store-credentials` first.
 
-## Cut a release
+The app version remains 0.1.22 for the plugin API contract. Release tags use `v0.1.22`. Do not replace an asset already published under that tag.
 
-1. Make sure `main` is clean and the tests pass:
+## Prepare the signed submission
 
-   ```bash
-   go test ./internal/...
-   ```
+Commit the source to publish, then run:
 
-2. Add a section for the new version at the top of [`CHANGELOG.md`](CHANGELOG.md), in the same style as the ones below it, and add its compare link at the bottom. Leave out website and test-only changes.
+```sh
+go test ./internal/...
+scripts/release-app.sh prepare 0.1.22 \
+  'Developer ID Application: ROBOPUNK FOUNDATION (68S3R4UWP6)' \
+  "$HOME/Library/Keychains/login.keychain-db"
+```
 
-3. Bump `version` in [`mygo.config.ts`](mygo.config.ts).
+The script creates `build/release/0.1.22/`, signs with hardened runtime, checks the bundle version, identifier, arm64 architecture, and Mach-O minimum OS version, and saves `submission.zip` and its SHA-256 checksum. It refuses an existing release directory. The only entitlement disables library validation so the optional Homebrew libmpv can load. The embedded moejs interpreter does not need JIT entitlements. libmpv is not bundled.
 
-4. Commit with the bare version as the message, tag it, and push both:
+## Notarize and staple
 
-   ```bash
-   git commit -am "0.1.6"
-   git tag v0.1.6
-   git push origin main v0.1.6
-   ```
+```sh
+scripts/release-app.sh notarize 0.1.22 robopunk-notary \
+  "$HOME/Library/Keychains/login.keychain-db"
+```
 
-   The tag must match the version in `mygo.config.ts`, or the workflow stops. You can also run the workflow by hand (`gh workflow run release.yml`) instead of pushing a tag. It then tags the version in `mygo.config.ts` itself.
+The command verifies the submission hash, submits it, saves the submission ID in `submission.json`, and waits for Apple's result. It saves Apple's log and checks its submission ID and archive hash. Rerun the command after an interruption to resume that submission. If interruption happens before the receipt is saved, recover the ID with `xcrun notarytool history --keychain-profile robopunk-notary --keychain "$HOME/Library/Keychains/login.keychain-db"` and save the matching receipt as `submission.json` before rerunning.
 
-5. Wait for the workflow (`gh run watch`). It creates a **draft** release, using the version's `CHANGELOG.md` section as the notes, and uploads the macOS, Windows and Linux builds, their installers, the update manifests and the deltas from earlier versions.
+After acceptance, the script extracts the original submission, staples and validates the ticket, checks Gatekeeper and the signature, then creates `mygo-music-lite-0.1.22-darwin-arm64.zip` and its `.sha256` file. It refuses to overwrite a final archive. Keep the whole release directory as the release record.
 
-6. Check the draft's notes and assets, then publish it:
+Open the stapled app from the final zip and check local playback, optional mpv fallback, and a plugin before publishing. Signing and notarization do not verify those behaviors.
 
-   ```bash
-   gh release edit v0.1.6 --draft=false --latest
-   ```
+## Publish the app and Homebrew cask
 
-   Installed apps only pick up the update once it's published.
+Create the tag on the tested source commit and publish only the final zip and checksum:
 
-7. Deploy the website. Its download pages read the latest release when it's built, so they show the old version until it's deployed again:
+```sh
+git tag v0.1.22
+git push origin main v0.1.22
+gh release create v0.1.22 \
+  build/release/0.1.22/mygo-music-lite-0.1.22-darwin-arm64.zip \
+  build/release/0.1.22/mygo-music-lite-0.1.22-darwin-arm64.zip.sha256 \
+  --title 'MyGo Music Lite 0.1.22' --notes-file /path/to/release-notes.md
+scripts/render-cask.sh 0.1.22 > /path/to/homebrew-tap/Casks/mygo-music-lite.rb
+```
 
-   ```bash
-   bun run deploy
-   ```
+Review and commit the cask in `txchen/homebrew-tap`, then push it. Verify installation from the public release:
 
-   This runs `vite build && wrangler deploy` in `website/`, and needs Wrangler signed in to the Cloudflare account (`bunx wrangler login`).
+```sh
+brew install --cask txchen/tap/mygo-music-lite
+```
 
-## Secrets
-
-The workflow needs these repository secrets:
-
-| Secret | Used for |
-| --- | --- |
-| `MACOS_CERTIFICATE`, `MACOS_CERTIFICATE_PASSWORD` | The Developer ID certificate (base64 `.p12`) that signs the macOS app |
-| `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` | Notarizing the macOS disk images |
-| `MYGO_UPDATER_PRIVATE_KEY` | Signing the updates; its public key is `updates.publicKey` in `mygo.config.ts` |
-
-## Podcast caption libraries
-
-The sherpa-onnx libraries are released separately, as the `sherpa-onnx-<version>` prerelease, and only change when that version changes. See the README.
+The manual GitHub Actions build workflow produces an ad-hoc signed artifact for development. It does not publish releases. The app does not connect to the upstream app updater. Plugin updates retain the upstream behavior.

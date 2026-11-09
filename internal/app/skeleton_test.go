@@ -37,7 +37,6 @@ var skeletonScenes = []struct {
 		a.comments = commentState{track: "\x001", lib: a.library, id: "1", loading: true, loaded: true, total: 1, list: []music.Comment{{ID: "1", Text: "好听"}}}
 	}},
 	{"lyrics", func(a *app) { a.nowPlaying, a.npPane = true, paneLyrics }},
-	{"stage", func(a *app) { a.nowPlaying, a.npPane = true, paneStage }},
 }
 
 func skeletonApp(set func(a *app)) *app {

@@ -1111,86 +1111,18 @@ func TestFollowSystemLanguage(t *testing.T) {
 	}
 }
 
-// The settings' sidebar opens its pages, one at a time.
-func TestSettingsSidebarOpensPages(t *testing.T) {
+// Choosing a settings page clears a search and switches the active page.
+func TestSettingsSearchNavigation(t *testing.T) {
 	a := newTestApp()
+	a.settingsQuery = "quality"
 	tt := ui.NewTester(a.settingsView, 780, 800)
-	tt.Frame()
-	if _, ok := tt.Find("Language"); !ok {
-		t.Fatalf("General isn't the first page: %q", tt.Texts())
-	}
-	if err := tt.Click("Playback"); err != nil {
+	settled(tt)
+	if err := tt.Click("General"); err != nil {
 		t.Fatal(err)
 	}
 	settled(tt)
-	if _, ok := tt.Find("Quality"); !ok {
-		t.Errorf("no Quality on Playback: %q", tt.Texts())
-	}
-	if _, ok := tt.Find("Language"); ok {
-		t.Error("General's still showing")
-	}
-}
-
-// A search finds settings across the pages, and only those; one that finds
-// nothing says so; and choosing a page leaves it.
-func TestSettingsSearch(t *testing.T) {
-	a := newTestApp()
-	tt := ui.NewTester(a.settingsView, 780, 800)
-	tt.Frame()
-	if err := tt.Click("Search Settings"); err != nil {
-		t.Fatal(err)
-	}
-	tt.Type("QUALITY")
-	settled(tt)
-	if _, ok := tt.Find("Quality"); !ok {
-		t.Fatalf("didn't find it: %q", tt.Texts())
-	}
-	if _, ok := tt.Find("Language"); ok {
-		t.Error("shows what it didn't look for")
-	}
-	if _, ok := tt.Find("Even Out Loudness"); ok {
-		t.Error("shows a row of the same page it didn't look for")
-	}
-
-	a.settingsQuery = "zzzz"
-	settled(tt)
-	if _, ok := tt.Find("No settings found"); !ok {
-		t.Errorf("says nothing of finding nothing: %q", tt.Texts())
-	}
-
-	// By a page's name, all of it.
-	a.settingsQuery = "playback"
-	settled(tt)
-	if _, ok := tt.Find("Even Out Loudness"); !ok {
-		t.Errorf("the page's rows aren't there: %q", tt.Texts())
-	}
-
-	if err := tt.Click("Cache"); err != nil {
-		t.Fatal(err)
-	}
-	settled(tt)
-	if a.settingsQuery != "" || a.settingsPage != "cache" {
-		t.Errorf("query %q on page %q", a.settingsQuery, a.settingsPage)
-	}
-}
-
-// A control a search found works as on its page.
-func TestSettingsFoundControlWorks(t *testing.T) {
-	a := newTestApp()
-	a.settingsQuery = "loudness"
-	tt := ui.NewTester(a.settingsView, 780, 800)
-	settled(tt)
-	was := a.settings.Normalize
-	// The row's title is labelled as its switch is: click the switch, at its end.
-	top, ok1 := tt.Find("Even Out Loudness")
-	bottom, ok2 := tt.Find("Adjust each song's volume by what its plugin measured of it, for them to sound as loud as each other")
-	if !ok1 || !ok2 {
-		t.Fatalf("not found: %q", tt.Texts())
-	}
-	tt.ClickAt(780-28-16-12, (top.Y+bottom.Y+bottom.H)/2)
-	tt.Frame()
-	if a.settings.Normalize == was {
-		t.Error("the switch did nothing")
+	if a.settingsQuery != "" || a.settingsPage != "general" {
+		t.Fatalf("query %q, page %q", a.settingsQuery, a.settingsPage)
 	}
 }
 

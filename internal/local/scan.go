@@ -243,7 +243,7 @@ func walk(ctx context.Context, folders []string) []found {
 				return nil
 			}
 			switch strings.ToLower(filepath.Ext(name)) {
-			case ".mp3", ".flac", ".ogg", ".wav", ".m4a", ".aac":
+			case ".mp3", ".flac", ".ogg", ".oga", ".opus", ".wav", ".m4a", ".aac", ".aif", ".aiff", ".wma", ".ape", ".wv", ".webm":
 			default:
 				return nil
 			}
@@ -323,16 +323,8 @@ func (s *Source) readFile(file found) (entry, bool) {
 
 	typ := fileType(f, file.path)
 	var track *mp4.Track
-	switch typ {
-	case "m4a":
-		var ok bool
-		if track, ok = m4aTrack(f, file.size); !ok {
-			return entry{}, false // HE-AAC, say, which the player doesn't decode
-		}
-	case "aac":
-		if !adtsPlayable(f) {
-			return entry{}, false
-		}
+	if typ == "m4a" {
+		track, _ = m4aTrack(f, file.size)
 	}
 	t := readTags(f, typ, file.size)
 	e := entry{
@@ -352,15 +344,17 @@ func (s *Source) readFile(file found) (entry, bool) {
 	switch typ {
 	case "flac":
 		e.Duration = flacDuration(f)
-	case "ogg":
+	case "ogg", "oga", "opus":
 		e.Duration = oggDuration(f, file.size)
 	case "wav":
 		e.Duration = wavDuration(f, file.size)
 	case "m4a":
-		e.Duration = track.Duration.Milliseconds()
+		if track != nil {
+			e.Duration = track.Duration.Milliseconds()
+		}
 	case "aac":
 		e.Duration = adtsDuration(f, file.size)
-	default:
+	case "mp3":
 		e.Duration = mp3Duration(f, file.size)
 	}
 	if t.picture != nil {
@@ -618,7 +612,7 @@ func fileType(f io.ReaderAt, path string) string {
 		return "mp3"
 	}
 	switch ext := strings.ToLower(filepath.Ext(path)); ext {
-	case ".flac", ".ogg", ".wav", ".m4a", ".aac":
+	case ".flac", ".ogg", ".oga", ".opus", ".wav", ".m4a", ".aac", ".aif", ".aiff", ".wma", ".ape", ".wv", ".webm":
 		return ext[1:]
 	}
 	return "mp3"
