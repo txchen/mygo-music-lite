@@ -26,6 +26,8 @@ jobs:
         run: test "$(uname -m)" = arm64
       - name: Install optional playback engine for integration tests
         run: brew install mpv
+      - name: Build bundled audio libraries
+        run: scripts/build-audio.sh
       - name: Build
         run: go build -o /dev/null .
       - name: Test

@@ -2,6 +2,15 @@
 
 Lite changes are listed first, followed by the upstream MyGo Music history. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.4.0 - 2026-11-09
+
+### Changed
+
+- Bundled FFmpeg decoding and miniaudio output replace AVPlayer as the default playback backend. Common local and direct network formats no longer need a separate playback library; optional libmpv fallback remains.
+- Fragmented MP4 streams play and seek directly through the authorized byte relay. The AVPlayer-specific internal HLS conversion has been removed.
+- Playback handles asynchronous seeks, decoder/resampler EOF draining, paused output, and cancellation of blocked network reads. Network permissions and existing queue/plugin behavior remain.
+- Release downloads include corresponding application/audio-library sources and license notices. This release remains macOS Apple Silicon only.
+
 ## 0.3.1 - 2026-11-09
 
 ### Fixed

@@ -1,9 +1,12 @@
 package player
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"net/http"
-	"strings"
+	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -115,19 +118,14 @@ func TestNetworkStreamUsesRelay(t *testing.T) {
 	}
 }
 
-// Closing while metadata is loading cancels the old request and never opens its native engine.
-func TestCloseDuringHLSPreparation(t *testing.T) {
-	_, _, all := indexedFixture(0, 0)
+// Closing during the network format probe cancels it and never opens a stale output.
+func TestCloseDuringNetworkValidation(t *testing.T) {
 	started, cancelled := make(chan struct{}), make(chan struct{})
-	server := indexedServer(t, all, func(w http.ResponseWriter, r *http.Request) bool {
-		if r.Header.Get("Range") == "bytes=0-511" {
-			return false
-		}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		close(started)
 		<-r.Context().Done()
 		close(cancelled)
-		return true
-	})
+	}))
 	defer server.Close()
 	posted := make(chan func(), 8)
 	p := New(func(fn func()) { posted <- fn })
@@ -141,13 +139,13 @@ func TestCloseDuringHLSPreparation(t *testing.T) {
 	select {
 	case <-started:
 	case <-time.After(time.Second):
-		t.Fatal("metadata preparation did not start")
+		t.Fatal("format validation did not start")
 	}
 	p.Close()
 	select {
 	case <-cancelled:
 	case <-time.After(time.Second):
-		t.Fatal("Close left metadata request active")
+		t.Fatal("Close left format request active")
 	}
 	for range 2 {
 		select {
@@ -158,16 +156,24 @@ func TestCloseDuringHLSPreparation(t *testing.T) {
 		}
 	}
 	if opened != 0 || p.relay != nil || p.Ready() {
-		t.Fatal("cancelled preparation reopened native playback")
+		t.Fatal("cancelled validation reopened native playback")
 	}
 }
 
-// Native fallback reads the original direct file route without enabling manifest references in mpv.
-func TestInternalHLSNativeFallbackUsesDirectRoute(t *testing.T) {
-	_, _, all := indexedFixture(0, 0)
-	server := indexedServer(t, all, nil)
+// Both native engines keep the same authorized direct route through fallback.
+func TestNativeFallbackKeepsDirectRoute(t *testing.T) {
+	all, err := os.ReadFile("testdata/seek-aac-frag.m4a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeContent(w, r, "audio.m4a", time.Time{}, bytes.NewReader(all))
+	}))
 	defer server.Close()
-	relay := preparedRelay(t, server.URL)
+	relay, err := newAudioRelay(&music.Stream{URL: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
 	p := New(func(fn func()) { fn() })
 	defer p.Close()
 	p.Cue([]music.Track{{ID: "a"}})
@@ -178,14 +184,27 @@ func TestInternalHLSNativeFallbackUsesDirectRoute(t *testing.T) {
 		calls++
 		if !fallback {
 			if st.URL != relay.url {
-				t.Fatal("primary did not receive internal HLS")
+				t.Fatal("primary did not receive relay route")
 			}
 			return nil, errors.New("primary unavailable")
 		}
-		if st.URL != strings.TrimSuffix(relay.url, "/index.m3u8") || st.Headers != nil || st.AuthorizeURL != nil {
+		if st.URL != relay.url || st.Headers != nil || st.AuthorizeURL != nil {
 			t.Fatal("fallback lost direct secure route")
 		}
-		res, b := getRelay(t, "GET", st.URL, "bytes=0-31")
+		req, err := http.NewRequest("GET", st.URL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Range", "bytes=0-31")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, err := io.ReadAll(res.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if res.StatusCode != 206 || len(b) != 32 {
 			t.Fatal("fallback direct route unavailable")
 		}
@@ -193,6 +212,6 @@ func TestInternalHLSNativeFallbackUsesDirectRoute(t *testing.T) {
 	}
 	p.startEngine(&music.Stream{URL: server.URL}, engineLoad{dir: stay})
 	if calls != 2 || !p.Ready() || p.relay != relay {
-		t.Fatal("fallback did not retain prepared relay")
+		t.Fatal("fallback did not retain relay")
 	}
 }
