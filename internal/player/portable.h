@@ -8,6 +8,7 @@ void mm_audio_play(mm_audio *, int);
 void mm_audio_seek(mm_audio *, double);
 void mm_audio_volume(mm_audio *, float);
 int mm_audio_state(mm_audio *);
+int mm_audio_device_running(mm_audio *);
 double mm_audio_position(mm_audio *);
 double mm_audio_duration(mm_audio *);
 uint64_t mm_audio_consumed(mm_audio *);
