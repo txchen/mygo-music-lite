@@ -416,7 +416,6 @@ func (n *notch) expanded(c *ui.Context, tr *music.Track, open, left float32) {
 	a := n.a
 	pl := a.pl
 	art := a.art.get(sized(tr.Album.ImageURL, 200), false)
-	a.tickTimes(c)
 	col := ui.Column(c).Absolute().Top(n.h0+6).Left(left).Width(notchOpenW).Padding(8, 22, 16, 22).Gap(12).Opacity(max(0, open*1.4-0.4))
 	col.Translate(0, (1-open)*-10)
 	col.Children(func() {
