@@ -1,6 +1,6 @@
 # MyGo Music Lite: installation and fork changes
 
-MyGo Music Lite is a fork of [mygo-music](https://github.com/egoist/mygo-music). It targets native local and direct network playback on macOS 13 or later, on Apple Silicon. The app release version is `0.4.0`. The upstream plugin compatibility baseline is separately fixed at `0.1.22`.
+MyGo Music Lite is a fork of [mygo-music](https://github.com/egoist/mygo-music). It targets native local and direct network playback on macOS 13 or later, on Apple Silicon. The app release version is `0.4.1`. The upstream plugin compatibility baseline is separately fixed at `0.1.22`.
 
 ## Install and upgrade
 
@@ -49,6 +49,8 @@ A plugin's audio URL and each redirect must match its declared network permissio
 Plugin metadata requests, artwork, and manual file downloads retain their existing behavior. Plugins that control playback in another program retain the remote playback API.
 
 Lite removes spectrum analysis, the lyric stage, word animation, speech transcription, persistent audio caching, normalization, fades, and gapless playback. Ordinary line-synced lyrics, local folders and tags, covers, playlists, search, queue controls, session restore, and media keys remain. Image caching and manually saving an audio file remain too.
+
+Playback time and progress refresh together once per second during steady playback. Pointer interaction, seeking, and other animations still update as needed.
 
 See [playback verification](playback-verification.md) for native checks and the CPU measurement procedure. The engine change alone does not establish a measured performance improvement for every file or machine.
 

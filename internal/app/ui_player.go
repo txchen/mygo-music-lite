@@ -23,6 +23,7 @@ func secs(s float64) time.Duration { return time.Duration(s * float64(time.Secon
 // scrubber commits a seek on release, including releases outside the bar.
 func (a *app) scrubber(c *ui.Context, st *scrubState, track, fill ui.Color, height float32, _ ui.Color) ui.Element {
 	pl := a.pl
+	a.tickTimes(c)
 	dur := pl.Duration().Seconds()
 	if !st.active && !st.held {
 		st.v = pl.Position().Seconds()
@@ -69,15 +70,12 @@ func (a *app) scrubber(c *ui.Context, st *scrubState, track, fill ui.Color, heig
 			k := 12 * knob
 			p.Fill(ui.Rect{X: head - k/2, Y: r.Y + (r.H-k)/2, W: k, H: k}, fill, k/2)
 		}
-		if pl.Playing() && !st.active && dur > 0 && r.W > 0 {
-			p.After(max(100*time.Millisecond, secs(dur/float64(r.W*p.Scale()))))
-		}
 	})
 	return s
 }
 
-// tickTimes redraws the view as the next second of the track begins, for
-// the times shown.
+// tickTimes updates the clock and progress together once per track second.
+// Input and animations still request their own frames as needed.
 func (a *app) tickTimes(c *ui.Context) {
 	if a.pl.Playing() && a.pl.Ready() {
 		pos := a.pl.Position()
@@ -281,7 +279,6 @@ func (a *app) playerBar(c *ui.Context) {
 	p := a.pal
 	pl := a.pl
 	tr := pl.Current()
-	a.tickTimes(c)
 	// Over the foot of the page: while content is under it, its edge frosts
 	// it, with a hairline along the top.
 	edge := ui.Box(c.Key("bottom-edge")).Absolute().Left(0).Right(0).Bottom(0).Height(playerBarHeight).

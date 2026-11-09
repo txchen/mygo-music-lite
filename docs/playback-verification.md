@@ -1,5 +1,20 @@
 # Playback verification
 
+## 0.4.1 refresh verification, 2026-11-09
+
+On the same M1 Mac mini, steady playback of a 180-second local AAC file on
+the visible Home page now builds and paints once per second. Five consecutive
+10-second samples measured full-process CPU at a median of 2.11% (1.88–2.14%).
+The earlier four-paints-per-second Lite build measured 3.09% (3.01–3.22%).
+These were separate batches, not an interleaved A/B; they do not establish
+the same savings for other hardware, tracks, animated pages, or network playback.
+
+The full internal suite and MyGo vet passed. Playback-clock accessibility,
+seek-on-release, and Space-after-opening-Now-Playing checks passed five runs.
+Native window checks confirmed seeking, advancing visible/accessibility time,
+and a stable paused position. The shared clock retains standard text widgets.
+
+
 ## 0.4.0 verification, 2026-11-09
 
 On an M1 Mac mini running macOS 27.2, the complete internal test suite, MyGo vet,
@@ -18,8 +33,7 @@ anonymous YouTube playback of `-Siljd9PwKs`, seeking to 5000 seconds before
 continuing and pausing. The network run consumed about 3 MiB through bounded
 ranges rather than fetching the whole track. It used the final playback core
 and hardened signing; the driver build differs from the release by the driver
-itself. The desktop was locked, so visible UI rendering and physical listening
-were not verified. Output-energy tests separately confirmed nonzero samples
+itself. That run did not verify visible UI rendering or physical listening. Output-energy tests separately confirmed nonzero samples
 reach the device callback at nonzero volume. Linux/Windows and physical device
 switching were not tested.
 

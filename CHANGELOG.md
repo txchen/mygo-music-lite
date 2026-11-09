@@ -2,6 +2,13 @@
 
 Lite changes are listed first, followed by the upstream MyGo Music history. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.4.1 - 2026-11-09
+
+### Changed
+
+- Playback time and progress now refresh together once per second, reducing CPU use while the window is visible. Dragging, seeking, and animations remain responsive.
+- Home, Now Playing, and the expanded mini player share the playback clock schedule while retaining standard text and accessibility updates.
+
 ## 0.4.0 - 2026-11-09
 
 ### Changed
