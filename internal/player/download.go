@@ -1,13 +1,18 @@
 package player
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"mygo-music/internal/music"
 )
@@ -88,22 +93,117 @@ func (s *Song) copy(w io.Writer) error {
 		_, err := io.Copy(w, s.file)
 		return err
 	}
-	req, err := http.NewRequest("GET", s.st.URL, nil)
+
+	target, err := audioURL(s.st.URL)
 	if err != nil {
 		return err
+	}
+	if s.st.AuthorizeURL != nil {
+		if err := s.st.AuthorizeURL(target); err != nil {
+			return err
+		}
+	}
+	client := *music.HeadersStay(http.DefaultClient, target.Hostname(), s.st.Headers)
+	redirect := client.CheckRedirect
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("too many audio redirects")
+		}
+		if _, err := audioURL(req.URL.String()); err != nil {
+			return err
+		}
+		if via[len(via)-1].URL.Scheme == "https" && req.URL.Scheme != "https" {
+			return errors.New("insecure audio redirect")
+		}
+		if s.st.AuthorizeURL != nil {
+			if err := s.st.AuthorizeURL(req.URL); err != nil {
+				return err
+			}
+		}
+		if redirect != nil {
+			return redirect(req, via)
+		}
+		return nil
+	}
+	var offset, total int64
+	total = -1
+	validator := ""
+	for {
+		n, size, tag, err := s.copyRange(w, &client, offset, total, validator)
+		if err != nil {
+			return err
+		}
+		offset += n
+		if size < 0 || offset == size {
+			return nil
+		}
+		total, validator = size, tag
+	}
+}
+
+var contentRangePattern = regexp.MustCompile(`^bytes ([0-9]+)-([0-9]+)/([0-9]+)$`)
+
+const downloadChunk = int64(1024 * 1024)
+
+// copyRange bounds each CDN request; a server ignoring the first Range may send
+// the whole file. Later full responses must never be appended to partial data.
+func (s *Song) copyRange(w io.Writer, client *http.Client, offset, total int64, validator string) (int64, int64, string, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	timer := time.AfterFunc(30*time.Second, cancel)
+	defer timer.Stop()
+	req, err := http.NewRequestWithContext(ctx, "GET", s.st.URL, nil)
+	if err != nil {
+		return 0, 0, "", err
 	}
 	req.Header.Set("User-Agent", music.Agent)
 	for k, v := range s.st.Headers {
 		req.Header.Set(k, v)
 	}
-	res, err := music.HeadersStay(http.DefaultClient, req.URL.Hostname(), s.st.Headers).Do(req)
+	req.Header.Set("Accept-Encoding", "identity")
+	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", offset, offset+downloadChunk-1))
+	if validator != "" {
+		req.Header.Set("If-Range", validator)
+	}
+	res, err := client.Do(req)
 	if err != nil {
-		return err
+		return 0, 0, "", errors.New("audio download connection failed or timed out")
 	}
 	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return errors.New(res.Status)
+	reader := &relayReader{body: res.Body, timer: timer}
+	if res.StatusCode == http.StatusOK && offset == 0 {
+		n, err := io.Copy(w, reader)
+		return n, -1, "", err
 	}
-	_, err = io.Copy(w, res.Body)
-	return err
+	if res.StatusCode != http.StatusPartialContent {
+		return 0, 0, "", fmt.Errorf("audio download returned HTTP %d", res.StatusCode)
+	}
+	match := contentRangePattern.FindStringSubmatch(res.Header.Get("Content-Range"))
+	if match == nil {
+		return 0, 0, "", errors.New("audio server returned an invalid byte range")
+	}
+	values := make([]int64, 3)
+	for i := range values {
+		values[i], err = strconv.ParseInt(match[i+1], 10, 64)
+		if err != nil {
+			return 0, 0, "", errors.New("audio server returned an invalid byte range")
+		}
+	}
+	start, end, size := values[0], values[1], values[2]
+	tag := res.Header.Get("ETag")
+	if strings.HasPrefix(tag, "W/") {
+		tag = ""
+	}
+	if tag == "" {
+		tag = res.Header.Get("Last-Modified")
+	}
+	if start != offset || end < start || end-start >= downloadChunk || end >= size || total >= 0 && total != size || validator != "" && validator != tag {
+		return 0, 0, "", errors.New("audio file changed or the server returned an unexpected byte range")
+	}
+	expected := end - start + 1
+	n, err := io.Copy(w, io.LimitReader(reader, expected+1))
+	if err == nil && n != expected {
+		err = io.ErrUnexpectedEOF
+	}
+	return n, size, tag, err
 }

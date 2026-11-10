@@ -5,7 +5,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -133,9 +132,9 @@ func TestSongMenuDownloads(t *testing.T) {
 	dir := t.TempDir()
 	suggested := make(chan string, 1)
 	real := saveSongAs
-	saveSongAs = func(a *app, name string) string {
+	saveSongAs = func(a *app, name string) (string, error) {
 		suggested <- name
-		return filepath.Join(dir, "picked.mp3")
+		return filepath.Join(dir, "picked.mp3"), nil
 	}
 	defer func() { saveSongAs = real }()
 
@@ -158,7 +157,9 @@ func TestSongMenuDownloads(t *testing.T) {
 	if name := wait(t, suggested, "where to save it"); name != "AC_DC - Back in Black.mp3" {
 		t.Errorf("suggested %q", name)
 	}
-	until(t, ch, func() bool { return strings.HasPrefix(a.toast, "Downloaded") })
+	until(t, ch, func() bool {
+		return len(a.downloadNotices) > 0 && a.downloadNotices[len(a.downloadNotices)-1].Type == "success"
+	})
 	if b, _ := os.ReadFile(filepath.Join(dir, "picked.mp3")); string(b) != "the song" {
 		t.Errorf("saved %q", b)
 	}

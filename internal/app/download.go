@@ -1,12 +1,15 @@
 package app
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/ui"
 
 	"mygo-music/internal/local"
 	"mygo-music/internal/music"
@@ -15,7 +18,7 @@ import (
 // saveSongAs asks the listener where to save a song with the native dialog,
 // suggesting name in their Downloads folder, and returns the path, or "" if
 // they didn't pick one. It blocks, so it runs on a goroutine; tests replace it.
-var saveSongAs = func(a *app, name string) string {
+var saveSongAs = func(a *app, name string) (string, error) {
 	dir, _ := mygo.App.Path(mygo.PathDownloads)
 	path, err := mygo.Dialog.Save(mygo.SaveDialogOptions{
 		Parent:            a.win,
@@ -24,10 +27,7 @@ var saveSongAs = func(a *app, name string) string {
 		ButtonLabel:       T("Download"),
 		CreateDirectories: true,
 	})
-	if err != nil {
-		return ""
-	}
-	return path
+	return path, err
 }
 
 // canDownload reports whether tr can be saved to a file of the listener's: a
@@ -43,26 +43,43 @@ func (a *app) canDownload(tr *music.Track) bool {
 // settings say, from the cache if it's kept there; toasts say how it goes.
 func (a *app) download(tr music.Track) {
 	lib := a.trackLib(&tr)
+	if lib == nil {
+		return
+	}
+	a.downloadSerial++
+	noticeID := fmt.Sprintf("download-%d", a.downloadSerial)
+	fail := func(err error) {
+		a.post(func() {
+			a.downloadNotices = append(a.downloadNotices, ui.Toast{ID: noticeID, Title: T("Couldn't download this song"), Description: err.Error(), Type: "error", Timeout: -1})
+		})
+	}
 	quality := a.settings.Quality
 	go func() {
 		song, err := a.pl.FindSong(lib.src, tr, quality)
 		if err != nil {
-			a.post(func() { a.actionFailed(lib, err, T("Couldn't download this song")) })
+			fail(err)
 			return
 		}
-		path := saveSongAs(a, songFileName(&tr, song.Type))
+		path, err := saveSongAs(a, songFileName(&tr, song.Type))
+		if err != nil {
+			song.Close()
+			fail(err)
+			return
+		}
 		if path == "" {
 			song.Close()
 			return
 		}
-		a.post(func() { a.toast = T("Downloading…") })
-		err = song.SaveTo(path)
 		a.post(func() {
-			if err != nil {
-				a.actionFailed(lib, err, T("Couldn't download this song"))
-				return
-			}
-			a.toast = Tf("Downloaded %s", tr.Name)
+			a.downloadNotices = append(a.downloadNotices, ui.Toast{ID: noticeID, Title: T("Downloading…"), Description: tr.Name, Timeout: -1})
+		})
+		err = song.SaveTo(path)
+		if err != nil {
+			fail(err)
+			return
+		}
+		a.post(func() {
+			a.downloadNotices = append(a.downloadNotices, ui.Toast{ID: noticeID, Title: Tf("Downloaded %s", tr.Name), Type: "success", Timeout: 10 * time.Second, Action: T("Show in Folder"), OnAction: func() { mygo.Shell.ShowItemInFolder(path) }})
 		})
 	}()
 }
