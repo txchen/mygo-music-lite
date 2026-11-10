@@ -1,10 +1,14 @@
-//go:build darwin && arm64 && cgo
+//go:build cgo && ((darwin && arm64) || (linux && amd64) || (windows && amd64))
 
 package player
 
 /*
-#cgo CFLAGS: -std=c11 -I${SRCDIR}/../../build/audio/darwin-arm64/include
-#cgo LDFLAGS: ${SRCDIR}/../../build/audio/darwin-arm64/lib/libavformat.a ${SRCDIR}/../../build/audio/darwin-arm64/lib/libavcodec.a ${SRCDIR}/../../build/audio/darwin-arm64/lib/libswresample.a ${SRCDIR}/../../build/audio/darwin-arm64/lib/libavutil.a -framework CoreAudio -framework AudioToolbox -framework CoreFoundation -lpthread -lm
+#cgo darwin CFLAGS: -std=c11 -I${SRCDIR}/../../build/audio/darwin-arm64/include
+#cgo darwin LDFLAGS: ${SRCDIR}/../../build/audio/darwin-arm64/lib/libavformat.a ${SRCDIR}/../../build/audio/darwin-arm64/lib/libavcodec.a ${SRCDIR}/../../build/audio/darwin-arm64/lib/libswresample.a ${SRCDIR}/../../build/audio/darwin-arm64/lib/libavutil.a -framework CoreAudio -framework AudioToolbox -framework CoreFoundation -lpthread -lm
+#cgo linux CFLAGS: -std=c11 -D_DEFAULT_SOURCE -I${SRCDIR}/../../build/audio/linux-amd64/include
+#cgo linux LDFLAGS: ${SRCDIR}/../../build/audio/linux-amd64/lib/libavformat.a ${SRCDIR}/../../build/audio/linux-amd64/lib/libavcodec.a ${SRCDIR}/../../build/audio/linux-amd64/lib/libswresample.a ${SRCDIR}/../../build/audio/linux-amd64/lib/libavutil.a -lpthread -ldl -lm
+#cgo windows CFLAGS: -std=c11 -I${SRCDIR}/../../build/audio/windows-amd64/include
+#cgo windows LDFLAGS: ${SRCDIR}/../../build/audio/windows-amd64/lib/libavformat.a ${SRCDIR}/../../build/audio/windows-amd64/lib/libavcodec.a ${SRCDIR}/../../build/audio/windows-amd64/lib/libswresample.a ${SRCDIR}/../../build/audio/windows-amd64/lib/libavutil.a -static -lwinpthread -lws2_32 -lole32 -luuid -lbcrypt -lm
 #include <stdlib.h>
 #include "portable.h"
 */

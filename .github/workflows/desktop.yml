@@ -1,0 +1,36 @@
+name: Build Linux and Windows
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [linux-amd64, windows-amd64]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: oven-sh/setup-bun@v2
+      - run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64-posix nsis
+      - name: Build audio
+        env:
+          AUDIO_TARGET: ${{ matrix.target }}
+        run: scripts/build-audio.sh
+      - name: Build packages
+        env:
+          TARGET: ${{ matrix.target }}
+          CGO_ENABLED: '1'
+        run: |
+          if [ "$TARGET" = windows-amd64 ]; then
+            export CC=x86_64-w64-mingw32-gcc-posix
+          fi
+          go tool mygo build -platform "${TARGET/-//}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: build/${{ matrix.target }}/

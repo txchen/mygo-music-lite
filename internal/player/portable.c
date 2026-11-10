@@ -1,4 +1,4 @@
-//go:build darwin && arm64 && cgo
+//go:build cgo && ((darwin && arm64) || (linux && amd64) || (windows && amd64))
 
 #define _DARWIN_C_SOURCE 1
 #include "portable.h"
