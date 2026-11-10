@@ -2,6 +2,13 @@
 
 Lite changes are listed first, followed by the upstream MyGo Music history. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.4.2 - 2026-11-09
+
+### Fixed
+
+- Direct network playback no longer reuses an expired loopback connection between byte ranges, preventing interruptions and unintended libmpv fallback around the first minute of typical YouTube songs.
+- Optional libmpv fallback now preserves the primary backend's linear volume gain instead of making playback quieter.
+
 ## 0.4.1 - 2026-11-09
 
 ### Changed

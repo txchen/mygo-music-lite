@@ -173,7 +173,9 @@ static int open_input(mm_audio *a) {
   av_dict_set(&opts, "format_whitelist",
               "mov,mp3,flac,wav,matroska,webm,ogg,aac,wv,aiff,ape,asf", 0);
   av_dict_set(&opts, "rw_timeout", "30000000", 0);
-  av_dict_set(&opts, "multiple_requests", "1", 0);
+  // The loopback relay can expire an idle socket while a range is playing.
+  // Open a fresh local connection for each range; upstream TLS stays pooled.
+  av_dict_set(&opts, "multiple_requests", "0", 0);
   av_dict_set(&opts, "http_proxy", "", 0);
   av_dict_set(&opts, "request_size", "1048576", 0);
   av_dict_set(&opts, "short_seek_size", "32768", 0);

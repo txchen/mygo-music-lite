@@ -5,6 +5,7 @@ package player
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -183,7 +184,8 @@ func (p *mpvPlayer) Duration() time.Duration {
 	return p.duration
 }
 func (p *mpvPlayer) SetVolume(v float64) {
-	p.err = mpvError(mpvAPI.setProperty(p.handle, "volume", strconv.FormatFloat(v*100, 'f', 4, 64)))
+	// mpv cubes its volume percentage; Transport takes linear PCM gain.
+	p.err = mpvError(mpvAPI.setProperty(p.handle, "volume", strconv.FormatFloat(math.Cbrt(v)*100, 'f', 4, 64)))
 }
 func (p *mpvPlayer) Close() {
 	if p.handle != 0 {

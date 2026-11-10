@@ -110,3 +110,16 @@ For hardened-runtime verification, compile the player tests with `go test -c -o 
 The AVPlayer-specific HLS adapter was removed in 0.4.0. Network tests now exercise fragmented AAC and FLAC directly through the relay. Authorization, redirect, invalid-container and cancellation checks remain.
 
 For isolated real-application network verification, use the `playbackcheck` build with `MM_CHECK_URL` instead of `MM_CHECK_FILE`; `MM_CHECK_SEEK=5000` also verifies a distant seek before sampling. Give it a public test URL or a temporary fixture server, never account credentials. These variables are absent from the normal release's behavior.
+
+
+## Network range interruption regression (2026-11-09)
+
+A signed-in real-app run of Daft Punk's “Give Life Back to Music” reproduced the listener's interruption near 1:02 twice. Diagnostic playback state changed from `portablePlayer` to `mpvPlayer` at that boundary. Earlier 30-second online probes missed this failure; their fast startup results do not establish uninterrupted playback.
+
+The native decoder requests 1 MiB ranges and previously kept its loopback HTTP connection alive. The relay's server expires idle connections after 30 seconds, while consuming a range of this AAC stream takes roughly a minute. The next range could reuse the expired socket and fail. Native range requests now use separate loopback connections; Go's upstream HTTP/TLS connection pool remains in use. `TestPortableExpiredRangeConnection` closes idle server connections and checks that native playback crosses the range boundary without a fallback. The original option failed at about 3.64 seconds with a larger-bitrate WAV fixture; the fix passed three repeated runs.
+
+A separate PCM-output regression exposed the volume mismatch on fallback. mpv's [volume implementation](https://github.com/mpv-player/mpv/blob/v0.41.0/player/audio.c#L161) cubes its percentage. Passing linear gain 0.64 therefore produced an energy ratio of 0.068719 instead of 0.409600. The adapter now converts linear gain to mpv's percentage, and `TestMPVLinearGain` verifies actual rendered float PCM, not just the property value. Five repeated runs passed after the correction.
+
+Diagnostic artifacts are in `/tmp/mygo-buffer-audit/`. They are not committed because this investigation uses a local signed-in session. Logs omit credentials and signed audio URLs. Startup delays above five seconds remain a separate report until reproduced through the complete app.
+
+The corrected full app retained the signed-in YouTube session and played the complete first track without backend switching or buffer underruns, then advanced to the next track. The listener confirmed the previously failing minute boundary no longer interrupted playback. Five manual album switches and eight further listener-selected songs also stayed on the primary engine. In the eight listener-selected starts, resolution took 122–267 ms and the first positive playback-position sample arrived within 771–1527 ms. Position sampling is periodic, so these are observation bounds, not precise first-sound latencies. The reported five-second startup on the other MacBook was not reproduced and is not claimed fixed by 0.4.2.
