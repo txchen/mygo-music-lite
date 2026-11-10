@@ -55,3 +55,14 @@ brew install --cask txchen/tap/mygo-music-lite
 ```
 
 The manual GitHub Actions build workflow produces an ad-hoc signed artifact for development. It does not publish releases. The app does not connect to the upstream app updater. Plugin updates retain the upstream behavior.
+
+## Linux and Windows preview builds
+
+Run the `Build Linux and Windows` workflow at the source commit to release.
+It builds x86-64 FFmpeg/miniaudio from checksum-verified sources and packages
+with MyGo (Linux tarball and Debian package; Windows NSIS installer). Download
+both workflow artifacts and inspect their contents before publishing. Windows
+is cross-compiled on Ubuntu using MinGW's POSIX threading implementation.
+Publish the corresponding source archive and SHA-256 checksums with the packages.
+Mark initial desktop releases as previews until human testers verify installation,
+playback and desktop behavior. Do not infer real-device acceptance from CI.

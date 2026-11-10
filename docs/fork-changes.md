@@ -87,3 +87,28 @@ Passing the version check does not guarantee that every plugin feature works. Pl
 For `playback: "stream"`, Lite accepts local file URLs and direct HTTP(S) audio returned by `stream`. It ignores the `gain` and `peak` normalization fields. For `playback: "remote"`, the plugin controls playback elsewhere through the retained remote API.
 
 Plugin install links use `mygo-music-lite://install-plugin?repo=owner/repo`; development builds use `mygo-music-lite-dev://`. The upstream README's `mygo-music://` links target the original app.
+
+## Linux and Windows preview (0.4.5)
+
+The first Linux and Windows builds target x86-64. They use the same bundled
+FFmpeg/miniaudio playback engine as macOS. The optional libmpv fallback is only
+available on macOS. These packages have build validation but still need desktop,
+real audio device, installation, and plugin acceptance testing.
+
+Download the matching package from the 0.4.5 release. On Windows, run the
+`mygo-music-lite-setup-0.4.5-amd64.exe` installer. This first Windows release is
+unsigned. On Debian/Ubuntu, install the `.deb` with `sudo apt install ./PACKAGE.deb`.
+Other Linux distributions can extract the `linux-amd64.tar.gz` and run
+`./mygo-music-lite` from the extracted folder. Linux requires a graphical desktop
+and a working audio service. Keep the extracted resources beside the executable.
+
+For upgrades, quit the player and install the newer package. Keep your existing
+app data. Please test local playback, network playback, pause/resume, seek,
+track switching, plugins, tray behavior, and quitting/reopening the app.
+
+To build on Ubuntu x86-64, install Go, Bun, make, gcc, and curl, then run
+`AUDIO_TARGET=linux-amd64 scripts/build-audio.sh` and
+`CGO_ENABLED=1 go tool mygo build -platform linux/amd64`.
+For Windows cross-compilation, additionally install
+`gcc-mingw-w64-x86-64-posix` and `nsis`, use `AUDIO_TARGET=windows-amd64`, then
+`CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc-posix go tool mygo build -platform windows/amd64`.
