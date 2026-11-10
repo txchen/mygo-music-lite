@@ -14,6 +14,7 @@ import (
 // settings are the listener's choices, kept in settings.json in the user
 // data directory.
 type settings struct {
+	DiagnosticLog bool `json:"-"`
 	// Language is what the app speaks: i18n.English or i18n.Chinese, or
 	// i18n.System for the system's.
 	Language string `json:"language"`

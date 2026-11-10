@@ -8,6 +8,7 @@ import (
 
 	"github.com/egoist/mygo"
 
+	"mygo-music/internal/diagnostics"
 	"mygo-music/internal/i18n"
 	"mygo-music/internal/lyrics"
 	"mygo-music/internal/music"
@@ -25,7 +26,8 @@ const (
 // methods run on the main thread; loading happens on goroutines, whose results
 // post brings back there.
 type Player struct {
-	post func(func())
+	traceID uint64
+	post    func(func())
 	// Quiet is post without a redraw, for what mostly changes nothing, if set.
 	Quiet func(func())
 	// Source finds the source of an ID, or nil if it's gone.
@@ -419,6 +421,7 @@ func (p *Player) Jump(i int) {
 
 // TogglePlay pauses or resumes the current engine without processing PCM.
 func (p *Player) TogglePlay() {
+	diagnostics.Record(p.traceID, "toggle_play", 0)
 	if p.remote != nil && p.remote.started {
 		p.remoteToggle()
 		return
@@ -450,6 +453,7 @@ func (p *Player) TogglePlay() {
 
 // Seek preserves the listener's pause/play intent while the engine seeks.
 func (p *Player) Seek(t time.Duration) {
+	diagnostics.Record(p.traceID, "seek_ms", t.Milliseconds())
 	t = max(0, t)
 	if d := p.Duration(); d > 0 {
 		t = min(t, d)
@@ -467,6 +471,7 @@ func (p *Player) Seek(t time.Duration) {
 }
 
 func (p *Player) SetVolume(v float64) {
+	diagnostics.Record(p.traceID, "volume_percent", int64(v*100))
 	p.volume = min(1, max(0, v))
 	p.applyGain()
 	if p.remote != nil {
@@ -585,6 +590,9 @@ func (p *Player) loadSkipping(at, skipped, dir int, play bool, from time.Duratio
 	p.stop()
 	p.gen++
 	gen := p.gen
+	p.traceID = diagnostics.ID()
+	traceID := p.traceID
+	diagnostics.Record(traceID, "load", 0)
 	p.at = at
 	p.track = &t
 	p.loading, p.playing, p.err = true, play, ""
@@ -613,7 +621,12 @@ func (p *Player) loadSkipping(at, skipped, dir int, play bool, from time.Duratio
 		if src == nil {
 			err = errNoSource
 		} else {
+			diagnostics.Record(traceID, "resolve_start", 0)
 			info, err = src.Stream(t.ID, quality)
+			diagnostics.Record(traceID, "resolve_end", 0)
+			if err != nil {
+				diagnostics.Record(traceID, "resolve_error", 1)
+			}
 			if err == nil && (info == nil || info.URL == "") {
 				err = music.ErrUnavailable
 			}
@@ -626,7 +639,13 @@ func (p *Player) loadSkipping(at, skipped, dir int, play bool, from time.Duratio
 				if err == nil {
 					// Closing the load cancels both validation and an unadopted relay.
 					context.AfterFunc(ctx, relay.Close)
+					relay.traceID = traceID
+					diagnostics.Record(traceID, "validate_start", 0)
 					err = relay.validate(ctx)
+					diagnostics.Record(traceID, "validate_end", 0)
+					if err != nil {
+						diagnostics.Record(traceID, "validate_error", 1)
+					}
 				}
 			}
 		}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"mygo-music/internal/diagnostics"
 	"mygo-music/internal/music"
 )
 
@@ -41,6 +42,8 @@ type engineLoad struct {
 	primaryErr       error
 	at, skipped, dir int
 	started          time.Time
+	lastTrace        time.Time
+	heard            bool
 }
 
 func (p *Player) startEngine(info *music.Stream, load engineLoad) {
@@ -65,6 +68,11 @@ func (p *Player) startEngine(info *music.Stream, load engineLoad) {
 		}
 	}
 	info = p.engineInfo
+	if load.fallback {
+		diagnostics.Record(p.traceID, "engine_mpv", 0)
+	} else {
+		diagnostics.Record(p.traceID, "engine_ffmpeg", 0)
+	}
 
 	var out engine
 	var err error
@@ -87,6 +95,7 @@ func (p *Player) startEngine(info *music.Stream, load engineLoad) {
 }
 
 func (p *Player) engineFailed(err error, load engineLoad) {
+	diagnostics.Record(p.traceID, "engine_error", p.Position().Milliseconds())
 	if p.out != nil {
 		if !p.loading {
 			p.pending = p.Position()
@@ -127,6 +136,23 @@ func (p *Player) pollEngine() {
 		return
 	}
 	state, err := out.Poll()
+	if diagnostics.Enabled() && !p.engineLoad.heard {
+		if native, ok := out.(interface{ consumed() uint64 }); ok && native.consumed() > 0 {
+			p.engineLoad.heard = true
+			diagnostics.Record(p.traceID, "first_output_observed", int64(native.consumed()))
+		}
+	}
+	if diagnostics.Enabled() && time.Since(p.engineLoad.lastTrace) >= time.Second {
+		p.engineLoad.lastTrace = time.Now()
+		diagnostics.Record(p.traceID, "position_ms", out.Position().Milliseconds())
+		if native, ok := out.(interface {
+			consumed() uint64
+			underruns() uint64
+		}); ok {
+			diagnostics.Record(p.traceID, "consumed_frames", int64(native.consumed()))
+			diagnostics.Record(p.traceID, "underruns", int64(native.underruns()))
+		}
+	}
 	if p.relay != nil && p.relay.Err() != nil {
 		err = p.relay.Err()
 	}
@@ -138,6 +164,7 @@ func (p *Player) pollEngine() {
 		return
 	}
 	if state == outputReady && p.loading {
+		diagnostics.Record(p.traceID, "engine_ready", 0)
 		p.loading = false
 		if p.pending > 0 {
 			out.Seek(p.pending)

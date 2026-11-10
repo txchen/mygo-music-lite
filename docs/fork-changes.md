@@ -1,6 +1,6 @@
 # MyGo Music Lite: installation and fork changes
 
-MyGo Music Lite is a fork of [mygo-music](https://github.com/egoist/mygo-music). It targets native local and direct network playback on macOS 13 or later, on Apple Silicon. The app release version is `0.4.2`. The upstream plugin compatibility baseline is separately fixed at `0.1.22`.
+MyGo Music Lite is a fork of [mygo-music](https://github.com/egoist/mygo-music). It targets native local and direct network playback on macOS 13 or later, on Apple Silicon. The app release version is `0.4.3`. The upstream plugin compatibility baseline is separately fixed at `0.1.22`.
 
 ## Install and upgrade
 
@@ -18,6 +18,16 @@ brew upgrade --cask txchen/tap/mygo-music-lite
 ```
 
 You can also download the app from [Lite releases](https://github.com/txchen/mygo-music-lite/releases/latest). Release bundles are signed and notarized.
+
+## Diagnose intermittent buffering
+
+1. Open **Settings → Playback** and enable **Playback Diagnostic Log**.
+2. Play or switch songs normally until the delay occurs.
+3. Choose **Export…** in the same settings page and share the saved JSON file for analysis. Export also reveals the file in Finder.
+
+Export before quitting: recording is session-only. Switching the log off keeps the evidence; switching it on again starts a fresh recording. The latest 16,384 events are retained, with an overflow count in the export. There is no automatic upload or playback-time disk logging. Song names, URLs, account credentials and raw error text are excluded.
+
+Logs distinguish source resolution, validation, network connection stages, yt-dlp subprocesses, native versus fallback engines, playback position and output underruns. First-output observation uses the existing 250 ms player poll, so it is not a sample-accurate startup timestamp. Plugin requests have individual IDs; match them to playback attempts by time rather than assuming all concurrent requests belong to a song.
 
 ## Build
 
