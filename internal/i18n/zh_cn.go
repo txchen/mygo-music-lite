@@ -2,6 +2,7 @@ package i18n
 
 // zhCN is the app's text in Simplified Chinese, by its English.
 var zhCN = map[string]string{
+	"Show in Folder":                 "在文件夹中显示",
 	"Enable Playback Diagnostic Log": "开启播放诊断日志",
 	"Playback Diagnostic Log":        "播放诊断日志",
 	"Record this session until you quit. Enable before reproducing, then export. No song names, URLs or credentials.": "仅记录本次运行。复现前开启，复现后导出；不含歌名、链接或账号凭据。",

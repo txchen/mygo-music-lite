@@ -89,11 +89,13 @@ type app struct {
 	// signInOver is the window the sign-in dialog is in, for a sign-in page
 	// to open over: the settings window's, if asked there. Set on the main
 	// thread, read on the plugin's.
-	signInOver  *atomic.Pointer[mygo.Window]
-	naming      nameDialog         // the name of a playlist asked for
-	deleting    deleteDialog       // whether to delete a playlist, asked
-	toast       string             // a message to show once
-	settingText map[string]*string // the settings of sources, as being typed
+	signInOver      *atomic.Pointer[mygo.Window]
+	naming          nameDialog   // the name of a playlist asked for
+	deleting        deleteDialog // whether to delete a playlist, asked
+	downloadNotices []ui.Toast
+	downloadSerial  uint64
+	toast           string             // a message to show once
+	settingText     map[string]*string // the settings of sources, as being typed
 
 	trackList ui.ListState
 	// Where the page and the sidebar are scrolled, kept while Now Playing

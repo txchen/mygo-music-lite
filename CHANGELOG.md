@@ -2,6 +2,13 @@
 
 Lite changes are listed first, followed by the upstream MyGo Music history. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.4.4 - 2026-11-09
+
+### Fixed
+
+- Manual network downloads use bounded byte ranges, avoiding YouTube's stalled full-file download path. Ranges are checked for completeness and consistency before the destination is replaced, and stalled network reads time out.
+- Download status stays visible while work continues. Failures remain visible until dismissed, save-dialog errors are reported, and completed downloads offer Show in Folder.
+
 ## 0.4.3 - 2026-11-09
 
 ### Added

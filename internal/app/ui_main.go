@@ -75,6 +75,10 @@ func (a *app) view(c *ui.Context) {
 	a.signInDialog(c, a.pal, false)
 	a.playlistNameDialog(c)
 	a.deletePlaylistDialog(c)
+	for _, notice := range a.downloadNotices {
+		c.AddToast(notice)
+	}
+	a.downloadNotices = nil
 	if a.toast != "" {
 		c.Toast(a.toast)
 		a.toast = ""
