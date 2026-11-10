@@ -1,6 +1,6 @@
 # MyGo Music Lite: installation and fork changes
 
-MyGo Music Lite is a fork of [mygo-music](https://github.com/egoist/mygo-music). It targets native local and direct network playback on macOS 13 or later, on Apple Silicon. The app release version is `0.4.3`. The upstream plugin compatibility baseline is separately fixed at `0.1.22`.
+MyGo Music Lite is a fork of [mygo-music](https://github.com/egoist/mygo-music). It targets native local and direct network playback on macOS 13 or later, on Apple Silicon. The app release version is `0.4.4`. The upstream plugin compatibility baseline is separately fixed at `0.1.22`.
 
 ## Install and upgrade
 
@@ -18,6 +18,12 @@ brew upgrade --cask txchen/tap/mygo-music-lite
 ```
 
 You can also download the app from [Lite releases](https://github.com/txchen/mygo-music-lite/releases/latest). Release bundles are signed and notarized.
+
+## Downloads
+
+Use **Download…** from a song's menu to save its original audio file. Network downloads use bounded byte ranges when supported, with a full-file fallback for servers that ignore the first range. Downloads validate range offsets, lengths, total size and available file validators; failed transfers leave an existing destination untouched. A connection or network read stalled for 30 seconds ends with an error.
+
+The downloading notice stays visible until completion or dismissal. Errors remain visible until dismissed; successful downloads offer **Show in Folder**.
 
 ## Diagnose intermittent buffering
 
