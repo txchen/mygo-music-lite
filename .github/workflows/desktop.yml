@@ -26,12 +26,13 @@ jobs:
           TARGET: ${{ matrix.target }}
           CGO_ENABLED: '1'
         run: |
+          CGO_ENABLED=0 go build -o "$RUNNER_TEMP/mygo" github.com/egoist/mygo/cmd/mygo
           if [ "$TARGET" = windows-amd64 ]; then
             export CC=x86_64-w64-mingw32-gcc-posix
           fi
           mkdir -p resources/licenses
           cp LICENSE THIRD_PARTY.md LICENSES/* resources/licenses/
-          go tool mygo build -platform "${TARGET/-//}"
+          "$RUNNER_TEMP/mygo" build -platform "${TARGET/-//}"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
