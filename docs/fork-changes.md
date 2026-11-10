@@ -99,7 +99,7 @@ Download the matching package from the 0.4.5 release. On Windows, run the
 `mygo-music-lite-setup-0.4.5-amd64.exe` installer. This first Windows release is
 unsigned. On Debian/Ubuntu, install the `.deb` with `sudo apt install ./PACKAGE.deb`.
 Other Linux distributions can extract the `linux-amd64.tar.gz` and run
-`./mygo-music-lite` from the extracted folder. Linux requires a graphical desktop
+`./mygo-music-lite` from the extracted folder. Linux requires glibc 2.35 or newer, a graphical desktop
 and a working audio service. Keep the extracted resources beside the executable.
 
 For upgrades, quit the player and install the newer package. Keep your existing
@@ -111,4 +111,5 @@ To build on Ubuntu x86-64, install Go, Bun, make, gcc, and curl, then run
 `CGO_ENABLED=1 go tool mygo build -platform linux/amd64`.
 For Windows cross-compilation, additionally install
 `gcc-mingw-w64-x86-64-posix` and `nsis`, use `AUDIO_TARGET=windows-amd64`, then
-`CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc-posix go tool mygo build -platform windows/amd64`.
+build the host tool first with `CGO_ENABLED=0 go build -o /tmp/mygo github.com/egoist/mygo/cmd/mygo`, then run
+`CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc-posix /tmp/mygo build -platform windows/amd64`.
