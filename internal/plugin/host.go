@@ -25,6 +25,7 @@ import (
 	"github.com/MoeForge/moejs"
 	"github.com/MoeForge/moejs/webapi"
 
+	"mygo-music/internal/diagnostics"
 	"mygo-music/internal/i18n"
 	"mygo-music/internal/music"
 )
@@ -355,6 +356,10 @@ func (p *Plugin) spawn(v *vm) native {
 		if !programs.Allows(p.dir, command) {
 			return moejs.Undefined(), fmt.Errorf("%s isn't one of the programs in the plugin's process permission", moejs.Arg(args, 0).String())
 		}
+		traceID := diagnostics.ID()
+		if filepath.Base(command) == "yt-dlp" {
+			diagnostics.Record(traceID, "yt_dlp_start", 0)
+		}
 		cmd := exec.Command(command, cmdArgs...)
 		cmd.Dir = p.dir
 		hideConsole(cmd)
@@ -389,6 +394,9 @@ func (p *Plugin) spawn(v *vm) native {
 			}
 			close(pr.lines)
 			err := cmd.Wait()
+			if filepath.Base(command) == "yt-dlp" {
+				diagnostics.Record(traceID, "yt_dlp_end", int64(cmd.ProcessState.ExitCode()))
+			}
 			v.mu.Lock()
 			delete(v.programs, pr)
 			v.mu.Unlock()

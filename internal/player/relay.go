@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"mygo-music/internal/diagnostics"
 	"mygo-music/internal/music"
 )
 
@@ -27,6 +28,7 @@ var errDirectAudio = errors.New("network playback supports direct audio files; H
 // audioRelay owns one track's requests. The native engine only sees its opaque
 // loopback route, so redirects and credentials stay inside the Go HTTP boundary.
 type audioRelay struct {
+	traceID      uint64
 	url          string
 	target       *url.URL
 	headers      http.Header
@@ -178,6 +180,7 @@ func (r *audioRelay) Close() {
 }
 
 func (r *audioRelay) failure(err error) {
+	diagnostics.Record(r.traceID, "relay_error", 1)
 	r.mu.Lock()
 	r.err = err
 	r.mu.Unlock()
@@ -230,7 +233,15 @@ func (r *audioRelay) ServeHTTP(w http.ResponseWriter, in *http.Request) {
 	if req.Header.Get("Range") != "" && req.Header.Get("If-Range") == "" && r.validator != "" {
 		req.Header.Set("If-Range", r.validator)
 	}
-	res, err := r.client.Do(req)
+	requestID := diagnostics.ID()
+	diagnostics.Record(requestID, "http_parent", int64(r.traceID))
+	diagnostics.Record(requestID, "http_start", 0)
+	res, err := r.client.Do(diagnostics.TraceHTTP(req, requestID))
+	if err != nil {
+		diagnostics.Record(requestID, "http_error", 1)
+	} else {
+		diagnostics.Record(requestID, "http_headers", int64(res.StatusCode))
+	}
 	if err != nil {
 		if ctx.Err() == nil {
 			r.failure(errors.New("network audio request failed or was denied"))
@@ -318,7 +329,15 @@ func (r *audioRelay) validate(ctx context.Context) error {
 	req.Header = r.headers.Clone()
 	req.Header.Set("Range", "bytes=0-511")
 	req.Header.Set("Accept-Encoding", "identity")
-	res, err := r.client.Do(req)
+	requestID := diagnostics.ID()
+	diagnostics.Record(requestID, "http_parent", int64(r.traceID))
+	diagnostics.Record(requestID, "http_start", 0)
+	res, err := r.client.Do(diagnostics.TraceHTTP(req, requestID))
+	if err != nil {
+		diagnostics.Record(requestID, "http_error", 1)
+	} else {
+		diagnostics.Record(requestID, "http_headers", int64(res.StatusCode))
+	}
 	if err != nil {
 		return errors.New("network audio request failed or was denied")
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 
+	"mygo-music/internal/diagnostics"
 	"mygo-music/internal/i18n"
 	"mygo-music/internal/local"
 	"mygo-music/internal/music"
@@ -396,6 +397,17 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 	}
 
 	add("playback", T("Playback"), iconVolume, func(row settingsRow, block settingsBlock) {
+		row(T("Playback Diagnostic Log"), T("Record this session until you quit. Enable before reproducing, then export. No song names, URLs or credentials."), func() {
+			if ui.Switch(c.Key("diagnostics"), &s.DiagnosticLog).Label(T("Enable Playback Diagnostic Log")).Changed() {
+				diagnostics.Set(s.DiagnosticLog)
+			}
+		})
+		row(T("Export Diagnostic Log"), T("Keeps the latest 16,384 events. Turning logging off preserves them until you quit."), func() {
+			if ui.Button(c.Key("export-diagnostics"), T("Export…")).Clicked() {
+				a.exportDiagnosticLog()
+			}
+		})
+
 		row(T("Quality"), T("What's asked of plugins that have a choice, from the next song on"), func() {
 			labels := make([]string, len(qualityLevels))
 			at := 1
