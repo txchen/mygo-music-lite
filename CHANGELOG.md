@@ -1,3 +1,10 @@
+## [0.4.5]
+
+- Add initial Linux x86-64 and Windows x86-64 packages using bundled FFmpeg/miniaudio.
+- Provide Linux Debian packages and tarballs, and a Windows installer.
+- These platforms are previews pending installation and real audio device testing.
+- Optional libmpv fallback remains macOS-only.
+
 # Changelog
 
 Lite changes are listed first, followed by the upstream MyGo Music history. Versions follow [Semantic Versioning](https://semver.org).
