@@ -38,6 +38,7 @@ import (
 	"github.com/MoeForge/moejs/eventloop"
 	"github.com/MoeForge/moejs/webapi"
 
+	"mygo-music/internal/diagnostics"
 	"mygo-music/internal/i18n"
 	"mygo-music/internal/music"
 )
@@ -490,7 +491,7 @@ func (p *Plugin) webOptions() webapi.Options {
 	if len(hosts) == 0 {
 		return webapi.Options{}
 	}
-	opts := webapi.Options{Client: &http.Client{Timeout: 10 * time.Minute}}
+	opts := webapi.Options{Client: &http.Client{Timeout: 10 * time.Minute, Transport: diagnostics.Transport{}}}
 	for _, h := range hosts {
 		if h == "*" {
 			return opts

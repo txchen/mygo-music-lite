@@ -2,6 +2,13 @@
 
 Lite changes are listed first, followed by the upstream MyGo Music history. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.4.3 - 2026-11-09
+
+### Added
+
+- Optional playback diagnostic logging in Settings → Playback, with JSON export for investigating intermittent buffering. Records source resolution, network connection phases, yt-dlp invocation, backend selection, output observations and underruns.
+- Recording is off by default, bounded to the latest 16,384 events, and kept in memory until export. Logs omit song names, URLs, credentials and raw error messages. Quit clears the recording.
+
 ## 0.4.2 - 2026-11-09
 
 ### Fixed
