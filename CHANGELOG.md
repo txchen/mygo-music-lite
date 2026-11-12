@@ -1,13 +1,19 @@
-## [0.4.5]
-
-- Add initial Linux x86-64 and Windows x86-64 packages using bundled FFmpeg/miniaudio.
-- Provide Linux Debian packages and tarballs, and a Windows installer.
-- These platforms are previews pending installation and real audio device testing.
-- Optional libmpv fallback remains macOS-only.
-
 # Changelog
 
 Lite changes are listed first, followed by the upstream MyGo Music history. Versions follow [Semantic Versioning](https://semver.org).
+
+## 0.4.6 - 2026-11-11
+
+### Fixed
+
+- Lyrics that a plugin fails to load are now logged with the plugin's error, instead of silently showing as no lyrics. YouTube Music lyrics while signed in are fixed in the plugin's 0.2.2 release.
+
+## 0.4.5 - 2026-11-10
+
+### Added
+
+- Initial Linux x86-64 and Windows x86-64 packages using bundled FFmpeg/miniaudio: Linux Debian packages and tarballs, and a Windows installer.
+- These platforms are previews pending installation and real audio device testing. Optional libmpv fallback remains macOS-only.
 
 ## 0.4.4 - 2026-11-09
 

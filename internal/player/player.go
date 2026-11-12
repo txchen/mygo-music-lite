@@ -3,6 +3,7 @@ package player
 import (
 	"context"
 	"errors"
+	"log"
 	"math/rand/v2"
 	"time"
 
@@ -697,8 +698,12 @@ func (p *Player) loadLyrics(gen int, src music.Source, t music.Track) {
 	go func() {
 		var lines []lyrics.Line
 		if src != nil && src.Can("lyrics") {
-			if l, err := src.Lyrics(t.ID); err == nil && l != nil {
+			l, err := src.Lyrics(t.ID)
+			if err == nil && l != nil {
 				lines = lyrics.FromSource(l)
+			} else if err != nil && !errors.Is(err, music.ErrUnsupported) {
+				// It still shows as none, but a failure isn't kept quiet.
+				log.Printf("lyrics from %s: %v", src.Info().ID, err)
 			}
 		}
 		p.post(func() {
