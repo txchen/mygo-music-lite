@@ -2,7 +2,7 @@ export default ({ command }: { command: string }) => ({
   name: "MyGo Music Lite",
   identifier: "dev.txchen.mygo-music-lite",
   slug: "mygo-music-lite",
-  version: "0.4.6",
+  version: "0.5.0",
   out: "build",
   urlSchemes: [command === "dev" ? "mygo-music-lite-dev" : "mygo-music-lite"],
   macos: {

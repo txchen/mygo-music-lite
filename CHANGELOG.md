@@ -2,6 +2,23 @@
 
 Lite changes are listed first, followed by the upstream MyGo Music history. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.5.0 - 2026-11-11
+
+### Added
+
+- Plugins can ask for password fields, switches and select menus in their settings, from upstream MyGo Music 0.1.23. Passwords are masked and saved explicitly; switches and selects save when changed. Existing plugins keep their text fields and string values.
+
+### Changed
+
+- Rebased on upstream MyGo Music 0.1.24 and updated MyGo to v0.9.0, which includes Linux and Windows desktop fixes.
+- The plugin compatibility baseline is now `0.1.24`, so plugins whose `minAppVersion` asks for the upstream 0.1.23 settings controls install.
+
+### Fixed
+
+- Scrolling over the volume control changes the volume by a consistent step per mouse-wheel event, instead of 25–33% per notch on Windows.
+- Now Playing's cover stays clear of the tabs while a radio plays.
+- Liked and Saved Albums use the titles the source gives them in its sidebar.
+
 ## 0.4.6 - 2026-11-11
 
 ### Fixed

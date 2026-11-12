@@ -136,7 +136,7 @@ type Manifest struct {
 
 // CompatibilityVersion is the upstream plugin baseline supported by Lite.
 // It is independent of the app release version and applies to development too.
-const CompatibilityVersion = "0.1.22"
+const CompatibilityVersion = "0.1.24"
 
 // NeedsNewerApp means a plugin requires a newer upstream compatibility baseline.
 type NeedsNewerApp struct {

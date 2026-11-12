@@ -1,6 +1,6 @@
 # MyGo Music Lite: installation and fork changes
 
-MyGo Music Lite is a fork of [mygo-music](https://github.com/egoist/mygo-music). It targets native local and direct network playback on macOS 13 or later, on Apple Silicon. The app release version is `0.4.4`. The upstream plugin compatibility baseline is separately fixed at `0.1.22`.
+MyGo Music Lite is a fork of [mygo-music](https://github.com/egoist/mygo-music). It targets native local and direct network playback on macOS 13 or later, on Apple Silicon. The app release version is `0.5.0`. The upstream plugin compatibility baseline is separately `0.1.24`.
 
 ## Install and upgrade
 
@@ -78,9 +78,9 @@ The supported app bundle targets macOS Apple Silicon only. The release process a
 
 ## Plugin compatibility
 
-The manifest field `minAppVersion` keeps its upstream JSON name for existing plugins. Lite compares it with the immutable upstream compatibility baseline `0.1.22`, rather than Lite's app release version. This check applies to installation, updates, discovery, and development builds.
+The manifest field `minAppVersion` keeps its upstream JSON name for existing plugins. Lite compares it with the upstream compatibility baseline `0.1.24`, the upstream version whose plugin API Lite includes, rather than Lite's app release version. This check applies to installation, updates, discovery, and development builds.
 
-A missing requirement or a valid requirement at or below `0.1.22` passes the version check. A requirement above that baseline, such as `0.1.23` or `0.2.0`, is rejected. A malformed requirement is rejected too. Raising Lite's app release version does not raise the baseline.
+A missing requirement or a valid requirement at or below `0.1.24` passes the version check. A requirement above that baseline, such as `0.1.25` or `0.2.0`, is rejected. A malformed requirement is rejected too. Raising Lite's app release version does not raise the baseline; only bringing in a newer upstream does.
 
 Passing the version check does not guarantee that every plugin feature works. Plugins still need to respect Lite's direct audio requirement and removed features. A network `stream` needs audio and redirect host permissions, and cannot be an HLS or DASH manifest. Timed lyric words do not restore the removed word animation. The baseline records the inherited API requirement, not complete upstream feature parity.
 

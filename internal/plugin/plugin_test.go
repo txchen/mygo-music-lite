@@ -635,7 +635,8 @@ func TestMinAppVersion(t *testing.T) {
 		{"0.1.8", true},
 		{"0.1.21", true},
 		{"0.1.22", true},
-		{"0.1.23", false},
+		{"0.1.24", true},
+		{"0.1.25", false},
 		{"0.2.0", false},
 	} {
 		t.Run(c.minimum, func(t *testing.T) {
