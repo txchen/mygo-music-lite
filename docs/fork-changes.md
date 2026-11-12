@@ -98,15 +98,15 @@ real audio device, installation, and plugin acceptance testing.
 On Arch Linux and other x86-64 Linux desktops, install for the current user:
 
 ```sh
-curl -fsSL https://github.com/txchen/mygo-music-lite/releases/download/v0.4.5/install-linux.sh | sh
+curl -fsSL https://github.com/txchen/mygo-music-lite/releases/download/v0.4.6/install-linux.sh | sh
 ```
 
 Run without sudo. The script verifies the pinned archive SHA-256, installs to
 `~/.local/mygo-music-lite.app`, and adds an application menu entry. Quit the app
 before rerunning the installer. Settings and playlists are preserved.
 
-Download the matching package from the 0.4.5 release. On Windows, run the
-`mygo-music-lite-setup-0.4.5-amd64.exe` installer. This first Windows release is
+Download the matching package from the latest release. On Windows, run the
+`mygo-music-lite-setup-VERSION-amd64.exe` installer. This first Windows release is
 unsigned. On Debian/Ubuntu, install the `.deb` with `sudo apt install ./PACKAGE.deb`.
 Other Linux distributions can extract the `linux-amd64.tar.gz` and run
 `./mygo-music-lite` from the extracted folder. Linux requires glibc 2.35 or newer, a graphical desktop
