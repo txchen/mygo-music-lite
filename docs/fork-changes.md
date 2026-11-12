@@ -98,7 +98,7 @@ real audio device, installation, and plugin acceptance testing.
 On Arch Linux and other x86-64 Linux desktops, install for the current user:
 
 ```sh
-curl -fsSL https://github.com/txchen/mygo-music-lite/releases/download/v0.4.6/install-linux.sh | sh
+curl -fsSL https://github.com/txchen/mygo-music-lite/releases/download/v0.5.0/install-linux.sh | sh
 ```
 
 Run without sudo. The script verifies the pinned archive SHA-256, installs to

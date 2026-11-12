@@ -18,10 +18,10 @@ main() {
   work=$(mktemp -d "$HOME/.local/.mygo-install.XXXXXX")
   trap 'rm -rf "$work"' EXIT
   trap 'exit 1' HUP INT TERM
-  archive=mygo-music-lite-0.4.6-linux-amd64.tar.gz
-  echo 'Downloading MyGo Music Lite 0.4.6...'
-  curl --fail --location --retry 3 "https://github.com/txchen/mygo-music-lite/releases/download/v0.4.6/$archive" -o "$work/$archive"
-  (cd "$work" && printf '%s  %s\n' 469260cd2f8e618bc62c8e576542509df18ffeb87c20cbe90bdec398a3f6041d "$archive" | sha256sum -c -)
+  archive=mygo-music-lite-0.5.0-linux-amd64.tar.gz
+  echo 'Downloading MyGo Music Lite 0.5.0...'
+  curl --fail --location --retry 3 "https://github.com/txchen/mygo-music-lite/releases/download/v0.5.0/$archive" -o "$work/$archive"
+  (cd "$work" && printf '%s  %s\n' 75d18b0be4cf8699a298429fd7c15889804255815a38e231c4574973513fe2bc "$archive" | sha256sum -c -)
   mkdir "$work/app"
   tar -xzf "$work/$archive" -C "$work/app"
   [ -x "$work/app/mygo-music-lite" ]
