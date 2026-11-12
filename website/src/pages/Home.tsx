@@ -12,7 +12,6 @@ export function Home() {
       <Hero />
       <Features />
       <Plugins />
-      <Apps />
     </Layout>
   )
 }
@@ -353,73 +352,6 @@ function Plugins() {
             </a>
           </div>
         </div>
-      </div>
-    </section>
-  )
-}
-
-const apps: { name: string; url: string; icon: string; body: [string, string] }[] = [
-  {
-    name: 'Screenflare',
-    url: 'https://screenflare.app',
-    icon: '/apps/screenflare.png',
-    body: [
-      'Screen recordings that edit themselves. Zooms on every click, a smoother cursor and a backdrop, for the Mac.',
-      '会自己剪辑的屏幕录制。每次点击自动放大，光标更平滑，还能加上背景，适用于 Mac。',
-    ],
-  },
-  {
-    name: 'Downbit',
-    url: 'https://downbit.app',
-    icon: '/apps/downbit.png',
-    body: [
-      'Download video and audio from the web, in a native app or on the command line. One Go binary, with no Python, yt-dlp or FFmpeg.',
-      '从网页下载视频与音频，有原生应用，也有命令行。由 Go 写成的单个程序，无需 Python、yt-dlp 或 FFmpeg。',
-    ],
-  },
-]
-
-function Apps() {
-  const t = useT()
-  return (
-    <section id="apps" class="section">
-      <div class="section-head">
-        <p class="eyebrow">{t('Other apps', '其他应用')}</p>
-        <h2 class="display">
-          <Tr
-            en={
-              <>
-                <span>From the same</span> <span>author.</span>
-              </>
-            }
-            zh={
-              <>
-                <span>同一位作者，</span>
-                <span>还做了这些。</span>
-              </>
-            }
-          />
-        </h2>
-        <p class="lede">
-          {t(
-            'Two more apps for the desktop, each one made to do a single thing well.',
-            '另外两款桌面应用，各自专注做好一件事。',
-          )}
-        </p>
-      </div>
-      <div class="apps">
-        <For each={apps}>
-          {(a) => (
-            <a class="feature app" href={a.url}>
-              <img class="app-icon" src={a.icon} alt="" width={72} height={72} />
-              <div class="app-text">
-                <h3>{a.name}</h3>
-                <p>{t(...a.body)}</p>
-                <span class="app-url">{a.url.replace('https://', '')}</span>
-              </div>
-            </a>
-          )}
-        </For>
       </div>
     </section>
   )
