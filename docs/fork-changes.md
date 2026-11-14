@@ -1,6 +1,6 @@
 # MyGo Music Lite: installation and fork changes
 
-MyGo Music Lite is a fork of [mygo-music](https://github.com/egoist/mygo-music). It targets native local and direct network playback on macOS 13 or later, on Apple Silicon. The app release version is `0.5.0`. The upstream plugin compatibility baseline is separately `0.1.24`.
+MyGo Music Lite is a fork of [mygo-music](https://github.com/egoist/mygo-music). It targets native local and direct network playback on macOS 13 or later, on Apple Silicon. The app release version is `0.5.1`. The upstream plugin compatibility baseline is separately `0.1.24`.
 
 ## Install and upgrade
 
@@ -123,3 +123,9 @@ For Windows cross-compilation, additionally install
 `gcc-mingw-w64-x86-64-posix` and `nsis`, use `AUDIO_TARGET=windows-amd64`, then
 build the host tool first with `CGO_ENABLED=0 go build -o /tmp/mygo github.com/egoist/mygo/cmd/mygo`, then run
 `CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc-posix /tmp/mygo build -platform windows/amd64`.
+
+## Application updates (0.5.1+)
+
+Install 0.5.1 once through Homebrew or the signed download. Later releases can be installed from the app’s Check for Updates menu. Automatic checks use only txchen/mygo-music-lite releases. The update window also offers automatic downloads. Updates require write access to the application’s installation directory. Homebrew casks declare auto_updates so normal brew upgrades defer to the application updater.
+
+Release maintainers: after scripts/release-app.sh finishes notarization, run scripts/package-update.sh VERSION UPDATE_KEY_FILE. Publish its tar.gz and update-darwin-arm64.json alongside the ZIP, before making the release public. Never publish update archives generated before Developer ID signing and notarization. Keep the update signing private key outside Git and back it up securely; future releases must use the same key.

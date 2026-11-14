@@ -6,6 +6,7 @@ import (
 	"runtime"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/updater"
 )
 
 // The app's icon in the menu bar on macOS, as the settings choose
@@ -129,6 +130,7 @@ func (a *app) trayMenu() *mygo.Menu {
 		{Label: T("Like/Unlike"), Click: run(a.likeCurrent)},
 		mygo.Separator(),
 		{Label: T("Settings…"), Click: run(front(a.openSettings))},
+		updater.MenuItem(),
 		mygo.Separator(),
 		{Label: Tf("Quit %s", name), Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
 	})

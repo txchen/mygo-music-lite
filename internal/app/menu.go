@@ -4,6 +4,7 @@ import (
 	"runtime"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/updater"
 )
 
 // setMenu gives the app its menu bar, in the listener's language and named as
@@ -19,6 +20,7 @@ func (a *app) setMenu() {
 	name := mygo.App.Name()
 	appMenu := []*mygo.MenuItem{
 		{Role: mygo.RoleAbout, Label: Tf("About %s", name)},
+		updater.MenuItem(),
 		mygo.Separator(),
 		{Label: T("Settings…"), Accelerator: "CmdOrCtrl+,", Click: run(a.openSettings)},
 		mygo.Separator(),

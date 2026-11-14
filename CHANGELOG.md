@@ -1,3 +1,7 @@
+## 0.5.1
+
+- Add signed application updates from the Lite release feed, with a native update window and Check for Updates menus.
+
 # Changelog
 
 Lite changes are listed first, followed by the upstream MyGo Music history. Versions follow [Semantic Versioning](https://semver.org).
