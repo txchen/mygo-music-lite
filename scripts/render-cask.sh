@@ -22,6 +22,8 @@ cask "mygo-music-lite" do
   desc "Music player with bundled FFmpeg and miniaudio playback"
   homepage "https://github.com/txchen/mygo-music-lite"
 
+  auto_updates true
+
   depends_on arch: :arm64
   depends_on macos: :ventura
 

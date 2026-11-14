@@ -59,10 +59,13 @@ PLIST
     echo "Prepared $submission"
     ;;
   notarize)
+    update_key=${MYGO_UPDATE_KEY_FILE:-"$HOME/.config/mygo-music-lite/update-keys/mygo-update.key"}
+    [[ -f $update_key ]] || { echo "Update signing key is required: set MYGO_UPDATE_KEY_FILE." >&2; exit 1; }
     (cd "$release" && shasum -a 256 -c submission.zip.sha256)
     if [[ -e $archive || -e $archive.sha256 ]]; then
       [[ -f $archive && -f $archive.sha256 ]] || { echo 'Incomplete final archive; inspect it before continuing.' >&2; exit 1; }
       (cd "$release" && shasum -a 256 -c "$(basename "$archive").sha256")
+      scripts/package-update.sh "$version" "$update_key"
       echo "Final archive already exists: $archive"
       exit 0
     fi
@@ -96,6 +99,7 @@ PLIST
     # Hard-link creation refuses an existing destination, even if another run creates it.
     ln "$staging/final.zip" "$archive"
     (cd "$release" && shasum -a 256 "$(basename "$archive")" > "$(basename "$archive").sha256")
+    scripts/package-update.sh "$version" "$update_key"
     echo "Ready to publish: $archive"
     ;;
   *) usage ;;
