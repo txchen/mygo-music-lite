@@ -19,6 +19,21 @@ brew upgrade --cask txchen/tap/mygo-music-lite
 
 You can also download the app from [Lite releases](https://github.com/txchen/mygo-music-lite/releases/latest). Release bundles are signed and notarized.
 
+## Recommended plugins
+
+These two plugins are used by the Lite maintainer and have been reported working in Lite. This reflects everyday use, not verification of every feature or platform.
+
+| Plugin | Repository to install | Why use it |
+| --- | --- | --- |
+| YouTube Music for Lite | [txchen/mygo-music-lite-youtube-music](https://github.com/txchen/mygo-music-lite-youtube-music) | Our Lite adaptation: YouTube Music search, library, recommendations and line-synced lyrics, with direct audio playback. |
+| Navidrome | [TengYangTuoHai/mygo-music-navidrome](https://github.com/TengYangTuoHai/mygo-music-navidrome) | Connect your own Navidrome server; browse music, manage playlists and favorites, and play original audio or server-transcoded MP3. |
+
+In **Settings → Plugins → +**, choose installation from GitHub and paste the repository name above. Install into Lite itself: upstream `mygo-music://` installation links open the original app.
+
+For YouTube Music, follow the plugin's setup instructions; its fallback needs `yt-dlp` and `deno` (`brew install yt-dlp deno` on macOS). Signed-in catalog access does not guarantee playback of account-only or restricted audio. For Navidrome, enter your server URL, username and password in plugin settings. Its optional external lyrics lookup can be disabled by setting **External lyrics** to `off`.
+
+Find more community plugins in the [upstream plugin directory](https://cloudmusic.egoist.dev/plugins/). Directory inclusion does not establish Lite compatibility; see [Plugin compatibility](#plugin-compatibility) before installing.
+
 ## Downloads
 
 Use **Download…** from a song's menu to save its original audio file. Network downloads use bounded byte ranges when supported, with a full-file fallback for servers that ignore the first range. Downloads validate range offsets, lengths, total size and available file validators; failed transfers leave an existing destination untouched. A connection or network read stalled for 30 seconds ends with an error.
