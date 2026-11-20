@@ -2,7 +2,7 @@ export default ({ command }: { command: string }) => ({
   name: "MyGo Music Lite",
   identifier: "dev.txchen.mygo-music-lite",
   slug: "mygo-music-lite",
-  version: "0.5.1",
+  version: "0.5.2",
   updates: {
     publicKey: "XnQ//4wwe7Mh4wyzOCtmlhFM5uAgl5vXsmTvZj/m8jI=",
     github: "txchen/mygo-music-lite",
