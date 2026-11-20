@@ -8,7 +8,7 @@ require (
 	github.com/MoeForge/moejs v0.1.0-alpha.11
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/ebitengine/purego v0.11.1
-	github.com/egoist/mygo v0.9.0
+	github.com/egoist/mygo v0.10.0
 	golang.org/x/image v0.46.0
 	golang.org/x/text v0.43.0
 	rsc.io/qr v0.2.0
